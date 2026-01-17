@@ -8,7 +8,7 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
-use Pterodactyl\Http\Requests\Api\Client\Servers\StoreServerRequest;
+use Illuminate\Http\Request;
 use Pterodactyl\Services\Servers\ServerCreationService;
 
 class ServerCreationController extends ClientApiController
@@ -24,8 +24,13 @@ class ServerCreationController extends ClientApiController
     /**
      * Create a new server for the authenticated user using their bought resources.
      */
-    public function store(StoreServerRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
+        $request->validate([
+            'name' => 'required|string|min:3',
+            'nest_id' => 'required|integer|exists:nests,id',
+            'egg_id' => 'required|integer|exists:eggs,id',
+        ]);
         $user = $request->user();
 
         if ($user->bought_slots <= 0) {
