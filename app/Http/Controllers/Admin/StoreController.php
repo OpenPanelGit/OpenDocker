@@ -9,22 +9,23 @@ use Pterodactyl\Contracts\Repository\SettingsRepositoryInterface;
 
 class StoreController extends Controller
 {
-    private SettingsRepositoryInterface $settings;
-
-    public function __construct(SettingsRepositoryInterface $settings)
-    {
-        $this->settings = $settings;
-    }
-
     /**
      * Render the admin store index page.
      */
     public function index()
     {
-        return view('admin.store.index', [
-            'products' => StoreProduct::all(),
-            'afk_rate' => $this->settings->get('store:afk_rate', 0.1),
-        ]);
+        try {
+            $settings = app(SettingsRepositoryInterface::class);
+            return view('admin.store.index', [
+                'products' => StoreProduct::all(),
+                'afk_rate' => $settings->get('store:afk_rate', 0.1),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
     }
 
     /**
@@ -32,7 +33,7 @@ class StoreController extends Controller
      */
     public function updateSettings(Request $request)
     {
-        $this->settings->set('store:afk_rate', $request->input('afk_rate'));
+        app(SettingsRepositoryInterface::class)->set('store:afk_rate', $request->input('afk_rate'));
 
         return redirect()->route('admin.store.index')->with('success', 'Paramètres mis à jour avec succès.');
     }

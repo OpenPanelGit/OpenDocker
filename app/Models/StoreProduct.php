@@ -55,7 +55,7 @@ class StoreProduct extends Model
      *
      * @var array
      */
-    public static $validationRules = [
+    public static array $validationRules = [
         'name' => 'required|string|max:191',
         'description' => 'nullable|string|max:191',
         'type' => 'required|string|in:cpu,memory,disk,backups,databases,slots',
