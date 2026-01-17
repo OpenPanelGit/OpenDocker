@@ -20,6 +20,8 @@ import MobileTopBar from '@/components/elements/MobileTopBar';
 import Logo from '@/components/elements/PyroLogo';
 import { NotFound } from '@/components/elements/ScreenBlock';
 import StoreContainer from '@/components/store/StoreContainer';
+import CreateServerContainer from '@/components/dashboard/CreateServerContainer';
+import { Database } from '@gravity-ui/icons';
 
 import http from '@/api/http';
 
@@ -171,6 +173,22 @@ const DashboardRouter = () => {
                             <p>Store</p>
                         </NavLink>
                     </ul>
+
+                    <div className='mt-auto pt-8'>
+                        <div className='bg-brand/10 border border-brand/20 p-4 rounded-lg shadow-lg shadow-brand/5'>
+                            <div className='flex items-center gap-x-2 mb-1'>
+                                <Database width={16} height={16} className='text-brand' />
+                                <p className='text-xs text-white/40 uppercase font-black tracking-widest'>Your Balance</p>
+                            </div>
+                            <p className='text-xl font-bold text-white'>
+                                {Number(useStoreState(state => state.user.data?.coins || 0)).toFixed(2)}
+                                <span className='text-xs font-normal text-white/40 ml-1'>Coins</span>
+                            </p>
+                            <div className='w-full h-1 bg-white/5 rounded-full mt-3 overflow-hidden'>
+                                <div className='h-full bg-brand w-1/3 animate-pulse'></div>
+                            </div>
+                        </div>
+                    </div>
                 </MainSidebar>
 
                 <Suspense fallback={null}>
@@ -192,8 +210,7 @@ const DashboardRouter = () => {
                                 ))}
 
                                 <Route path='/store' element={<StoreContainer />} />
-                                <Route path='/create' element={<DashboardContainer />} /> {/* Placeholder */}
-
+                                <Route path='/create' element={<CreateServerContainer />} />
                                 <Route path='*' element={<NotFound />} />
                             </Routes>
                         </main>

@@ -5,6 +5,7 @@ import useFlash from '@/plugins/useFlash';
 import Spinner from '@/components/elements/Spinner';
 import { Cpu, Database, Folder, Layers, Plus, Tag } from '@gravity-ui/icons';
 import styled from 'styled-components';
+import { useStoreActions, useStoreState } from '@/state/hooks';
 
 const Card = styled.div`
     background: #1a1a1a;
@@ -35,13 +36,15 @@ const StoreContainer = () => {
     const { addFlash } = useFlash();
     const [loading, setLoading] = useState(true);
     const [products, setProducts] = useState<Product[]>([]);
-    const [balance, setBalance] = useState(0);
+
+    const balance = useStoreState((state) => state.user.data?.coins || 0);
+    const updateUserData = useStoreActions((actions) => actions.user.updateUserData);
 
     useEffect(() => {
         http.get('/api/client/store')
             .then(({ data }) => {
                 setProducts(data.products);
-                setBalance(Number(data.balance));
+                updateUserData({ coins: Number(data.balance), rate: Number(data.rate) });
             })
             .catch((error) => {
                 console.error(error);
@@ -54,7 +57,7 @@ const StoreContainer = () => {
         http.post('/api/client/store/purchase', { product_id: productId })
             .then(({ data }) => {
                 addFlash({ type: 'success', message: data.message });
-                setBalance(Number(data.balance));
+                updateUserData({ coins: Number(data.balance) });
             })
             .catch((error) => {
                 const message = error.response?.data?.error || 'Une erreur est survenue lors de l\'achat.';
@@ -124,29 +127,6 @@ const StoreContainer = () => {
                             </div>
                         </Card>
                     ))}
-                </div>
-
-                <div className='bg-[#111] p-8 rounded-lg border border-white/5 mt-4'>
-                    <div className='max-w-2xl'>
-                        <h2 className='text-xl font-bold mb-4 flex items-center gap-x-2'>
-                            <div className='w-2 h-6 bg-brand rounded-full'></div>
-                            Comment gagner des Coins ?
-                        </h2>
-                        <ul className='space-y-4 text-white/70'>
-                            <li className='flex gap-x-3'>
-                                <div className='w-6 h-6 rounded-full bg-brand/20 text-brand flex items-center justify-center text-xs font-bold shrink-0'>1</div>
-                                <p>Restez simplement connecté sur le panel ! Vous gagnez des coins automatiquement chaque minute d'activité.</p>
-                            </li>
-                            <li className='flex gap-x-3'>
-                                <div className='w-6 h-6 rounded-full bg-brand/20 text-brand flex items-center justify-center text-xs font-bold shrink-0'>2</div>
-                                <p>Utilisez vos coins pour acheter du CPU, de la RAM ou de l'espace disque supplémentaire pour vos serveurs.</p>
-                            </li>
-                            <li className='flex gap-x-3'>
-                                <div className='w-6 h-6 rounded-full bg-brand/20 text-brand flex items-center justify-center text-xs font-bold shrink-0'>3</div>
-                                <p>Répartissez vos ressources achetées sur vos nouveaux serveurs lors de leur création.</p>
-                            </li>
-                        </ul>
-                    </div>
                 </div>
             </div>
         </PageContentBlock>

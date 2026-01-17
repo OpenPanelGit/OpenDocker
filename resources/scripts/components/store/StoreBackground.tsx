@@ -7,6 +7,8 @@ const StoreBackground = () => {
     const user = useStoreState((state) => state.user.data);
 
     useEffect(() => {
+        console.log('[Store] Background active. Rate:', user?.rate, 'Coins:', user?.coins);
+
         // 1. Per-second smooth visual bump
         const tickInterval = setInterval(() => {
             if (user && user.rate > 0) {
