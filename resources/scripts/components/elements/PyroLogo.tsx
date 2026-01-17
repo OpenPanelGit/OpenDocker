@@ -27,8 +27,8 @@ const Logo = ({ className, uniqueId }: { className?: string; uniqueId?: string }
                 clipRule='evenodd'
             ></path>
             <text
-                x='70'
-                y='42'
+                x='88'
+                y='38'
                 fill='#fff'
                 style={{
                     fontFamily: 'system-ui, -apple-system, sans-serif',

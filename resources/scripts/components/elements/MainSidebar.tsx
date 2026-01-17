@@ -13,9 +13,10 @@ const MainSidebar: any = styled.nav`
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.08);
 
-    .active {
-        color: #fa4e49;
-        fill: #fa4e49;
+    .active,
+    .active * {
+        color: #fa4e49 !important;
+        fill: #fa4e49 !important;
     }
 `;
 
