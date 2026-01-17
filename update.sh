@@ -16,14 +16,23 @@ function log() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-# Marquer le dossier comme sûr pour Git (évite l'erreur "dubious ownership")
+if [[ $EUID -ne 0 ]]; then
+    echo -e "${RED}[ERROR]${NC} Ce script doit être exécuté en tant que root (sudo ./update.sh)."
+    exit 1
+fi
+
+# Marquer le dossier comme sûr pour Git
 git config --global --add safe.directory $(pwd)
 
 log "Début de la mise à jour d'OpenPanel..."
 
 # 1. Récupérer les derniers changements
 log "Récupération des fichiers depuis le dépôt..."
-git pull
+git stash || true # Sauvegarder les changements locaux si besoin
+if ! git pull; then
+    echo -e "${RED}[ERROR]${NC} Échec du git pull. Vérifiez votre connexion ou vos conflits Git."
+    exit 1
+fi
 
 # 2. Installation des dépendances PHP
 log "Mise à jour des dépendances PHP (Composer)..."
