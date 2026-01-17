@@ -1,13 +1,13 @@
 # 🐳 OpenDocker
 
-**OpenDocker** est un fork moderne de **Pyrodactyl**, pensé pour offrir une expérience plus complète, plus stylée et plus évolutive 🚀  
+**OpenDocker** est un fork moderne de **OpenPanel**, pensé pour offrir une expérience plus complète, plus stylée et plus évolutive 🚀  
 L’objectif : un panel simple, puissant et prêt pour le futur.
 
 ---
 
 ## ✨ À propos
 
-OpenDocker reprend les bases solides de Pyrodactyl tout en ajoutant (et en prévoyant) des **fonctionnalités inédites** pour aller plus loin qu’un simple panel de gestion.
+OpenDocker reprend les bases solides de OpenPanel tout en ajoutant (et en prévoyant) des **fonctionnalités inédites** pour aller plus loin qu’un simple panel de gestion.
 
 👉 Idéal pour les hébergeurs, développeurs et projets qui veulent quelque chose de clean, moderne et scalable.
 
@@ -16,7 +16,7 @@ OpenDocker reprend les bases solides de Pyrodactyl tout en ajoutant (et en prév
 ## 🔥 Fonctionnalités
 
 ### ✅ Déjà disponible
-- 🧩 Basé sur **Pyrodactyl**
+- 🧩 Basé sur **OpenPanel**
 - 🎨 Interface moderne et agréable
 - 🐳 Gestion des conteneurs Docker
 - 🔐 Authentification sécurisée
@@ -64,13 +64,13 @@ Que ce soit pour :
 
 ## 📜 Licence
 
-Ce projet est sous licence **Apache-2.0** (comme Pyrodactyl).
+Ce projet est sous licence **Apache-2.0** (comme OpenPanel).
 
 ---
 
 ## ⭐ Crédit
 
-- Projet original : **Pyrodactyl**
+- Projet original : **OpenPanel**
 - Fork & évolution : **OpenDocker**
 
 ---

@@ -93,10 +93,10 @@ const NetworkContainer = () => {
                                     )}
                                     {(allocationLimit === null ||
                                         (allocationLimit > 0 && allocationLimit > data.length)) && (
-                                        <ActionButton variant='primary' onClick={onCreateAllocation} size='sm'>
-                                            New Allocation
-                                        </ActionButton>
-                                    )}
+                                            <ActionButton variant='primary' onClick={onCreateAllocation} size='sm'>
+                                                New Allocation
+                                            </ActionButton>
+                                        )}
                                 </div>
                             </Can>
                         )}
@@ -110,7 +110,7 @@ const NetworkContainer = () => {
                             </div>
                         </div>
                     ) : data.length > 0 ? (
-                        <PageListContainer data-pyro-network-container-allocations>
+                        <PageListContainer data-openpanel-network-container-allocations>
                             <For each={data} memo>
                                 {(allocation) => (
                                     <AllocationRow

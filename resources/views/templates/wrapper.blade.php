@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- Copyright (c) 2023-2025 Pyro Inc., parent collaborators, and contributors -->
-<html data-pyro-html lang="en" style="background-color: #000000; height: 100%; width: 100%; margin: 0; padding: 0;">
+<!-- Copyright (c) 2023-2025 OpenPanel Inc., parent collaborators, and contributors -->
+<html data-openpanel-html lang="en" style="background-color: #000000; height: 100%; width: 100%; margin: 0; padding: 0;">
     <head>
         <title>{{ config('app.name', 'Panel') }}</title>
 
@@ -15,7 +15,7 @@
             <link rel="icon" type="image/svg+xml" href="/favicons/favicon.svg" />
             <link rel="shortcut icon" href="/favicons/favicon.ico" />
             <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
-            <meta name="apple-mobile-web-app-title" content="Pyrodactyl" />
+            <meta name="apple-mobile-web-app-title" content="OpenPanel" />
             <link rel="manifest" href="/favicons/site.webmanifest" />
 
             <meta name="theme-color" content="#000000">
@@ -25,7 +25,7 @@
         @section('user-data')
             @if(!is_null(Auth::user()))
                 <script>
-                    window.PterodactylUser = {!! json_encode(Auth::user()->toVueObject()) !!};
+                    window.OpenPanelUser = {!! json_encode(Auth::user()->toVueObject()) !!};
                 </script>
             @endif
             @if(!empty($siteConfiguration))
@@ -45,7 +45,7 @@
         @viteReactRefresh
         @vite('resources/scripts/index.tsx')
     </head>
-    <body data-pyro-body class="{{ $css['body'] }}" style="background-color: #000000; height: 100%; width: 100%; margin: 0; padding: 0;">
+    <body data-openpanel-body class="{{ $css['body'] }}" style="background-color: #000000; height: 100%; width: 100%; margin: 0; padding: 0;">
         @section('content')
             @yield('above-container')
             @yield('container')

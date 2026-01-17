@@ -7,7 +7,7 @@ return [
   |--------------------------------------------------------------------------
   | Application Version
   |--------------------------------------------------------------------------
-  | This value is set when creating a Pterodactyl release. You should not
+  | This value is set when creating a OpenPanel release. You should not
   | change this value if you are not maintaining your own internal versions.
   */
 
@@ -24,7 +24,7 @@ return [
   |
   */
 
-  'name' => env('APP_NAME', 'Pyrodactyl'),
+  'name' => env('APP_NAME', 'OpenPanel'),
 
   /*
   |--------------------------------------------------------------------------

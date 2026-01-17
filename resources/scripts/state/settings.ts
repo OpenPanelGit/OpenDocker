@@ -4,6 +4,12 @@ export interface SiteSettings {
     name: string;
     locale: string;
     timezone: string;
+    captcha: {
+        enabled: boolean;
+        provider: string;
+        siteKey: string;
+        scriptIncludes: string[];
+    };
 }
 
 export interface SettingsStore {

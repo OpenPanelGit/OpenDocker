@@ -2,21 +2,30 @@
     "$schema": "https://json.schemastore.org/tsconfig",
     "display": "Default",
     "compilerOptions": {
-        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "lib": [
+            "DOM",
+            "DOM.Iterable",
+            "ESNext"
+        ],
         "jsx": "react-jsx",
         "module": "ESNext",
-        "target": "ES2015",
+        "target": "ES2022",
         "paths": {
-            "@/*": ["./resources/scripts/*"],
-            "@definitions/*": ["./resources/scripts/api/definitions/*"],
-            "@feature/*": ["./resources/scripts/components/server/features/*"]
+            "@/*": [
+                "./resources/scripts/*"
+            ],
+            "@definitions/*": [
+                "./resources/scripts/api/definitions/*"
+            ],
+            "@feature/*": [
+                "./resources/scripts/components/server/features/*"
+            ]
         },
         "plugins": [
             {
                 "name": "typescript-plugin-tw-template"
             }
         ],
-
         "allowJs": false,
         "allowSyntheticDefaultImports": true,
         "composite": false,
@@ -45,6 +54,12 @@
         "stripInternal": true,
         "useDefineForClassFields": true
     },
-    "include": ["./resources/scripts/**/*", "vite.config.ts", "./package.json"],
-    "exclude": ["node_modules"]
+    "include": [
+        "./resources/scripts/**/*",
+        "vite.config.ts",
+        "./package.json"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
 }

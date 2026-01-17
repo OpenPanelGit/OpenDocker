@@ -18,7 +18,7 @@ import { store } from '@/state';
 import { ServerContext } from '@/state/server';
 import { SiteSettings } from '@/state/settings';
 
-import PyrodactylProvider from './PyrodactylProvider';
+import OpenPanelProvider from './OpenPanelProvider';
 
 const DashboardRouter = lazy(() => import('@/routers/DashboardRouter'));
 const ServerRouter = lazy(() => import('@/routers/ServerRouter'));
@@ -26,7 +26,7 @@ const AuthenticationRouter = lazy(() => import('@/routers/AuthenticationRouter')
 
 interface ExtendedWindow extends Window {
     SiteConfiguration?: SiteSettings;
-    PterodactylUser?: {
+    OpenPanelUser?: {
         uuid: string;
         username: string;
         email: string;
@@ -40,17 +40,17 @@ interface ExtendedWindow extends Window {
 }
 
 const App = () => {
-    const { PterodactylUser, SiteConfiguration } = window as ExtendedWindow;
-    if (PterodactylUser && !store.getState().user.data) {
+    const { OpenPanelUser, SiteConfiguration } = window as ExtendedWindow;
+    if (OpenPanelUser && !store.getState().user.data) {
         store.getActions().user.setUserData({
-            uuid: PterodactylUser.uuid,
-            username: PterodactylUser.username,
-            email: PterodactylUser.email,
-            language: PterodactylUser.language,
-            rootAdmin: PterodactylUser.root_admin,
-            useTotp: PterodactylUser.use_totp,
-            createdAt: new Date(PterodactylUser.created_at),
-            updatedAt: new Date(PterodactylUser.updated_at),
+            uuid: OpenPanelUser.uuid,
+            username: OpenPanelUser.username,
+            email: OpenPanelUser.email,
+            language: OpenPanelUser.language,
+            rootAdmin: OpenPanelUser.root_admin,
+            useTotp: OpenPanelUser.use_totp,
+            createdAt: new Date(OpenPanelUser.created_at),
+            updatedAt: new Date(OpenPanelUser.updated_at),
         });
     }
 
@@ -62,9 +62,9 @@ const App = () => {
         <>
             <GlobalStylesheet />
             <StoreProvider store={store}>
-                <PyrodactylProvider>
+                <OpenPanelProvider>
                     <div
-                        data-pyro-routerwrap=''
+                        data-openpanel-routerwrap=''
                         className='relative w-full h-full flex flex-row p-2 overflow-hidden rounded-lg'
                     >
                         <Toaster
@@ -115,7 +115,7 @@ const App = () => {
                             </Routes>
                         </BrowserRouter>
                     </div>
-                </PyrodactylProvider>
+                </OpenPanelProvider>
             </StoreProvider>
         </>
     );

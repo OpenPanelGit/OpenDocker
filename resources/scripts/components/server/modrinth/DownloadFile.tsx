@@ -31,7 +31,7 @@ const DownloadModrinth: React.FC<DownloadProps> = ({ url, serverUuid, directory 
             const formData = new FormData();
             formData.append('files', file, fileName);
 
-            // 3️⃣ Upload to Pyrodactyl Server
+            // 3️⃣ Upload to OpenPanel Server
             toast.info(`Uploading ${fileName} to server...`);
             await axios.post(`/api/client/servers/${serverUuid}/files/upload`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },

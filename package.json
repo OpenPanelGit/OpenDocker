@@ -1,5 +1,5 @@
 {
-    "name": "pyrodactyl",
+    "name": "opendocker",
     "version": "canary",
     "buildNumber": "30",
     "engines": {
@@ -115,7 +115,7 @@
         "compose:down": "docker compose down",
         "build": "vite build",
         "build:turbo": "turbo build",
-        "build:docker:dev": "docker buildx build -t pyrodactyl:develop --build-arg DEV=true .",
+        "build:docker:dev": "docker buildx build -t openpanel:develop --build-arg DEV=true .",
         "ship": "turbo lint build"
     },
     "browserslist": [

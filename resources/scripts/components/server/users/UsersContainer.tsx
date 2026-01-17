@@ -126,7 +126,7 @@ const UsersContainer = () => {
                     </div>
                 </div>
             ) : (
-                <PageListContainer data-pyro-users-container-users>
+                <PageListContainer data-openpanel-users-container-users>
                     <For each={subusers} memo>
                         {(subuser) => <UserRow key={subuser.uuid} subuser={subuser} />}
                     </For>

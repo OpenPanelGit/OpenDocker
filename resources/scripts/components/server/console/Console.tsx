@@ -3,7 +3,6 @@ import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ITerminalOptions, Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import clsx from 'clsx';
 import debounce from 'debounce';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -15,8 +14,6 @@ import { ServerContext } from '@/state/server';
 import useEventListener from '@/plugins/useEventListener';
 import { usePermissions } from '@/plugins/usePermissions';
 import { usePersistedState } from '@/plugins/usePersistedState';
-
-import styles from './style.module.css';
 
 const theme = {
     // background: 'rgba(0, 0, 0, 0)',
@@ -51,7 +48,7 @@ const terminalProps: ITerminalOptions = {
 };
 
 const Console = () => {
-    const TERMINAL_PRELUDE = '\u001b[1m\u001b[33mcontainer@pyrodactyl~ \u001b[0m';
+    const TERMINAL_PRELUDE = '\\u001b[1m\\u001b[33mcontainer@openpanel~ \\u001b[0m';
     const ref = useRef<HTMLDivElement>(null);
     const terminal = useMemo(
         () =>

@@ -25,7 +25,7 @@ class AssetComposer
   public function compose(View $view): void
   {
     $view->with('siteConfiguration', [
-      'name' => config('app.name') ?? 'Pyrodactyl',
+      'name' => config('app.name') ?? 'OpenPanel',
       'locale' => config('app.locale') ?? 'en',
       'timezone' => config('app.timezone') ?? '',
       'captcha' => [

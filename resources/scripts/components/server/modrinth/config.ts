@@ -1,5 +1,5 @@
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import React, { ReactNode, createContext, useContext, useEffect, useState } from 'react';
+import axios, { AxiosError, AxiosRequestConfig, AxiosRequestHeaders } from 'axios';
+import React, { ReactNode, createContext, useContext, useState } from 'react';
 import { toast } from 'sonner';
 
 // ==================== TYPES ====================
@@ -76,7 +76,7 @@ export const MODRINTH_CONFIG = {
     getHeaders(appVersion: string): Record<string, string> {
         return {
             'Content-Type': 'application/json',
-            'User-Agent': `pyrodactyl/${appVersion} (pyrodactyl.dev)`,
+            'User-Agent': `openpanel/${appVersion} (openpanel.dev)`,
             Accept: 'application/json',
         };
     },
@@ -173,7 +173,7 @@ export const ModrinthService = {
                 config.headers = {
                     ...config.headers,
                     ...MODRINTH_CONFIG.getHeaders(appVersion),
-                };
+                } as unknown as AxiosRequestHeaders;
                 return config;
             });
 
@@ -181,7 +181,8 @@ export const ModrinthService = {
                 const config = error.config as AxiosRequestConfig & { _retryCount?: number };
                 config._retryCount = config._retryCount || 0;
 
-                if (error.response?.status === 429 || error.response?.status >= 500) {
+                const status = error.response?.status;
+                if (status && (status === 429 || status >= 500)) {
                     if (config._retryCount < MODRINTH_CONFIG.maxRetries) {
                         config._retryCount++;
                         const delay = Math.pow(2, config._retryCount) * 1000;
