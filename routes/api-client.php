@@ -31,6 +31,10 @@ Route::prefix('/store')->group(function () {
     Route::post('/afk', [Client\StoreController::class, 'afk'])->name('api:client.store.afk');
 });
 
+Route::prefix('/servers')->group(function () {
+    Route::post('/', [Client\Servers\ServerCreationController::class, 'store'])->name('api:client.servers.store');
+});
+
 Route::prefix('/nests')->group(function () {
     Route::get('/', [Client\Nests\NestController::class, 'index'])->name('api:client.nests');
     Route::get('/{nest}', [Client\Nests\NestController::class, 'view'])->name('api:client.nests.view');
