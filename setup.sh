@@ -31,6 +31,9 @@ if [[ $EUID -ne 0 ]]; then
    error "Ce script doit être exécuté en tant que root (sudo)."
 fi
 
+# Marquer le dossier comme sûr pour Git (évite l'erreur "dubious ownership")
+git config --global --add safe.directory $(pwd)
+
 log "Début de l'installation automatisée d'OpenPanel..."
 
 # 1. Mise à jour du système

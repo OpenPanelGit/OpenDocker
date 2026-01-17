@@ -77,7 +77,7 @@ const ServerSidebarNavItem = forwardRef<HTMLAnchorElement, ServerSidebarNavItemP
                 onClick={onClick}
                 className='flex flex-row items-center transition-colors duration-200 hover:bg-[#ffffff11] rounded-md'
             >
-                {Icon && <Icon className='ml-3' width={22} height={22} fill='currentColor' />}
+                {Icon && <Icon width={22} height={22} fill='currentColor' />}
                 <p>{name}</p>
             </NavLink>
         );

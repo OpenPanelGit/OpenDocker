@@ -145,7 +145,7 @@ const ServerRouter = () => {
     const calculateTop = (pathname: string): string | number => {
         if (!id) return '0';
 
-        const HighlightOffset = 8;
+        const HighlightOffset = 4;
 
         // Find matching route for the current pathname
         for (const route of navRoutes) {

@@ -16,11 +16,14 @@ function log() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
+# Marquer le dossier comme sûr pour Git (évite l'erreur "dubious ownership")
+git config --global --add safe.directory $(pwd)
+
 log "Début de la mise à jour d'OpenPanel..."
 
-# 1. Récupérer les derniers changements (Optionnel : décommentez si vous utilisez Git)
-# log "Récupération des fichiers depuis le dépôt..."
-# git pull
+# 1. Récupérer les derniers changements
+log "Récupération des fichiers depuis le dépôt..."
+git pull
 
 # 2. Installation des dépendances PHP
 log "Mise à jour des dépendances PHP (Composer)..."

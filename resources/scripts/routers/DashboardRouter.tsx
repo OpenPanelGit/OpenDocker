@@ -62,8 +62,8 @@ const DashboardRouter = () => {
         const ButtonSSH = NavigationSSH.current;
 
         // Perfectly center the page highlighter with simple math.
-        // Height of navigation links (56) minus highlight height (40) equals 16. 16 devided by 2 is 8.
-        const HighlightOffset: number = 8;
+        // Height of navigation links (48) minus highlight height (40) equals 8. 8 devided by 2 is 4.
+        const HighlightOffset: number = 4;
 
         if (pathname.endsWith(`/`) && ButtonHome != null) return (ButtonHome as any).offsetTop + HighlightOffset;
         if (pathname.endsWith(`/account`) && ButtonSettings != null)

@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 
-const MainSidebar = styled.nav`
+const MainSidebar: any = styled.nav`
     width: 300px;
     flex-direction: column;
     shrink: 0;
@@ -13,7 +13,7 @@ const MainSidebar = styled.nav`
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.08);
 
-    & > .pyro-subnav-routes-wrapper {
+    & > .openpanel-subnav-routes-wrapper {
         display: flex;
         flex-direction: column;
         font-size: 14px;
@@ -22,10 +22,10 @@ const MainSidebar = styled.nav`
         & > div {
             display: flex;
             position: relative;
-            padding: 16px 0;
-            gap: 8px;
+            padding: 12px 16px;
+            gap: 12px;
             font-weight: 600;
-            min-height: 56px;
+            min-height: 48px;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             user-drag: none;
