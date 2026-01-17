@@ -19,6 +19,7 @@ import { ServerContext } from '@/state/server';
 import { SiteSettings } from '@/state/settings';
 
 import OpenPanelProvider from './OpenPanelProvider';
+import StoreBackground from '@/components/store/StoreBackground';
 
 const DashboardRouter = lazy(() => import('@/routers/DashboardRouter'));
 const ServerRouter = lazy(() => import('@/routers/ServerRouter'));
@@ -36,6 +37,13 @@ interface ExtendedWindow extends Window {
         language: string;
         updated_at: string;
         created_at: string;
+        coins: number;
+        bought_cpu: number;
+        bought_memory: number;
+        bought_disk: number;
+        bought_slots: number;
+        bought_databases: number;
+        bought_backups: number;
     };
 }
 
@@ -51,6 +59,13 @@ const App = () => {
             useTotp: OpenPanelUser.use_totp,
             createdAt: new Date(OpenPanelUser.created_at),
             updatedAt: new Date(OpenPanelUser.updated_at),
+            coins: OpenPanelUser.coins,
+            boughtCpu: OpenPanelUser.bought_cpu,
+            boughtMemory: OpenPanelUser.bought_memory,
+            boughtDisk: OpenPanelUser.bought_disk,
+            boughtSlots: OpenPanelUser.bought_slots,
+            boughtDatabases: OpenPanelUser.bought_databases,
+            boughtBackups: OpenPanelUser.bought_backups,
         });
     }
 
@@ -63,6 +78,7 @@ const App = () => {
             <GlobalStylesheet />
             <StoreProvider store={store}>
                 <OpenPanelProvider>
+                    <StoreBackground />
                     <div
                         data-openpanel-routerwrap=''
                         className='relative w-full h-full flex flex-row p-2 overflow-hidden rounded-lg'

@@ -110,6 +110,11 @@
               <i class="bi bi-globe"></i> <span>Application API</span>
             </a>
           </li>
+          <li class="{{ !starts_with(Route::currentRouteName(), 'admin.store') ?: 'active' }}">
+            <a href="{{ route('admin.store.index')}}">
+              <i class="bi bi-cart-fill"></i> <span>Store Management</span>
+            </a>
+          </li>
           <li class="header">MANAGEMENT</li>
           <li class="{{ !starts_with(Route::currentRouteName(), 'admin.databases') ?: 'active' }}">
             <a href="{{ route('admin.databases') }}">

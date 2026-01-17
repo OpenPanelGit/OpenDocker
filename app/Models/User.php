@@ -128,6 +128,14 @@ class User extends Model implements
         'totp_authenticated_at',
         'gravatar',
         'root_admin',
+        'coins',
+        'last_afk_gain',
+        'bought_cpu',
+        'bought_memory',
+        'bought_disk',
+        'bought_slots',
+        'bought_databases',
+        'bought_backups',
     ];
 
     /**
@@ -138,6 +146,14 @@ class User extends Model implements
         'use_totp' => 'boolean',
         'gravatar' => 'boolean',
         'totp_authenticated_at' => 'datetime',
+        'coins' => 'decimal:4',
+        'last_afk_gain' => 'datetime',
+        'bought_cpu' => 'integer',
+        'bought_memory' => 'integer',
+        'bought_disk' => 'integer',
+        'bought_slots' => 'integer',
+        'bought_databases' => 'integer',
+        'bought_backups' => 'integer',
     ];
 
     /**

@@ -25,6 +25,12 @@ Route::get('/version', function () {
     return response()->json(['version' => config('app.version')]);
 });
 
+Route::prefix('/store')->group(function () {
+    Route::get('/', [Client\StoreController::class, 'index'])->name('api:client.store');
+    Route::post('/purchase', [Client\StoreController::class, 'purchase'])->name('api:client.store.purchase');
+    Route::post('/afk', [Client\StoreController::class, 'afk'])->name('api:client.store.afk');
+});
+
 Route::prefix('/nests')->group(function () {
     Route::get('/', [Client\Nests\NestController::class, 'index'])->name('api:client.nests');
     Route::get('/{nest}', [Client\Nests\NestController::class, 'view'])->name('api:client.nests.view');

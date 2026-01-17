@@ -8,6 +8,21 @@ Route::get('/', [Admin\BaseController::class, 'index'])->name('admin.index');
 
 /*
 |--------------------------------------------------------------------------
+| Store Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/store
+|
+*/
+Route::group(['prefix' => 'store'], function () {
+    Route::get('/', [Admin\StoreController::class, 'index'])->name('admin.store.index');
+    Route::post('/settings', [Admin\StoreController::class, 'updateSettings'])->name('admin.store.settings');
+    Route::post('/new', [Admin\StoreController::class, 'store'])->name('admin.store.new');
+    Route::delete('/{product}/delete', [Admin\StoreController::class, 'delete'])->name('admin.store.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Location Controller Routes
 |--------------------------------------------------------------------------
 |

@@ -1,4 +1,4 @@
-import { Ellipsis, Gear, House, Key, Lock } from '@gravity-ui/icons';
+import { Ellipsis, Gear, House, Key, Lock, Tag } from '@gravity-ui/icons';
 import { useStoreState } from 'easy-peasy';
 import { Fragment, Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
@@ -19,6 +19,7 @@ import { DashboardMobileMenu } from '@/components/elements/MobileFullScreenMenu'
 import MobileTopBar from '@/components/elements/MobileTopBar';
 import Logo from '@/components/elements/PyroLogo';
 import { NotFound } from '@/components/elements/ScreenBlock';
+import StoreContainer from '@/components/store/StoreContainer';
 
 import http from '@/api/http';
 
@@ -53,6 +54,7 @@ const DashboardRouter = () => {
     const NavigationSettings = useRef(null);
     const NavigationApi = useRef(null);
     const NavigationSSH = useRef(null);
+    const NavigationStore = useRef(null);
 
     const calculateTop = (pathname: string) => {
         // Get currents of navigation refs.
@@ -70,6 +72,8 @@ const DashboardRouter = () => {
             return (ButtonSettings as any).offsetTop + HighlightOffset;
         if (pathname.endsWith('/api') && ButtonApi != null) return (ButtonApi as any).offsetTop + HighlightOffset;
         if (pathname.endsWith('/ssh') && ButtonSSH != null) return (ButtonSSH as any).offsetTop + HighlightOffset;
+        if (pathname.endsWith('/store') && NavigationStore.current != null)
+            return (NavigationStore.current as any).offsetTop + HighlightOffset;
         return '0';
     };
 
@@ -162,6 +166,10 @@ const DashboardRouter = () => {
                             <Gear width={22} height={22} fill='currentColor' />
                             <p>Settings</p>
                         </NavLink>
+                        <NavLink to={'/store'} end className='flex flex-row items-center px-4 py-3 gap-x-3 font-semibold' ref={NavigationStore}>
+                            <Tag width={22} height={22} fill='currentColor' />
+                            <p>Store</p>
+                        </NavLink>
                     </ul>
                 </MainSidebar>
 
@@ -182,6 +190,9 @@ const DashboardRouter = () => {
                                         element={<Component />}
                                     />
                                 ))}
+
+                                <Route path='/store' element={<StoreContainer />} />
+                                <Route path='/create' element={<DashboardContainer />} /> {/* Placeholder */}
 
                                 <Route path='*' element={<NotFound />} />
                             </Routes>

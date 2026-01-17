@@ -11,6 +11,13 @@ export interface UserData {
     useTotp: boolean;
     createdAt: Date;
     updatedAt: Date;
+    coins: number;
+    boughtCpu: number;
+    boughtMemory: number;
+    boughtDisk: number;
+    boughtSlots: number;
+    boughtDatabases: number;
+    boughtBackups: number;
 }
 
 export interface UserStore {
