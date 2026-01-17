@@ -27,38 +27,44 @@ git config --global --add safe.directory $(pwd)
 log "Début de la mise à jour d'OpenPanel..."
 
 # 1. Récupérer les derniers changements
-log "Récupération des fichiers depuis le dépôt..."
-git stash || true # Sauvegarder les changements locaux si besoin
-if ! git pull; then
-    echo -e "${RED}[ERROR]${NC} Échec du git pull. Vérifiez votre connexion ou vos conflits Git."
+log "Vérification de l'état Git..."
+git config --global --add safe.directory $(pwd)
+git stash || true
+if ! git pull origin main; then
+    echo -e "${RED}[ERROR]${NC} Le git pull a échoué. Vérifiez les conflits."
     exit 1
 fi
 
-# 2. Installation des dépendances PHP
-log "Mise à jour des dépendances PHP (Composer)..."
+# 2. Détecter le gestionnaire de paquets
+if command -v pnpm &> /dev/null; then
+    PKG_MGR="pnpm"
+elif command -v npm &> /dev/null; then
+    PKG_MGR="npm"
+else
+    echo -e "${RED}[ERROR]${NC} Aucun gestionnaire de paquets (npm/pnpm) trouvé."
+    exit 1
+fi
+
+log "Utilisation de $PKG_MGR pour l'installation..."
+
+# 3. Installation des dépendances PHP
+log "Mise à jour Composer..."
 composer install --no-dev --optimize-autoloader
 
-# 3. Installation des dépendances JS et Compilation
-log "Mise à jour des dépendances JS et Reconstruction..."
-npm install
-npm run build
+# 4. Installation JS et Build
+log "Installation des dépendances JS..."
+$PKG_MGR install
+log "Lancement du build (Reconstruction de l'interface)..."
+$PKG_MGR run build
 
-# 4. Migration de la base de données
-log "Mise à jour de la base de données..."
+# 5. Base de données et Cache
+log "Migration et nettoyage..."
 php artisan migrate --force
+php artisan view:clear && php artisan config:clear && php artisan cache:clear && php artisan route:clear
 
-# 5. Nettoyage du cache
-log "Nettoyage du cache système..."
-php artisan view:clear
-php artisan config:clear
-php artisan cache:clear
-php artisan route:clear
-
-# 6. Permissions (S'assurer que www-data peut toujours écrire)
-log "Réapplication des permissions..."
+# 6. Permissions
+log "Réapplication des droits www-data..."
 chown -R www-data:www-data .
 chmod -R 755 storage bootstrap/cache
 
-log "--------------------------------------------------------"
-log "MISE À JOUR TERMINÉE AVEC SUCCÈS !"
-log "--------------------------------------------------------"
+log "✅ Mise à jour terminée ! Version actuelle : $(git rev-parse --short HEAD)"
