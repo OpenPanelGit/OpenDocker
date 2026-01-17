@@ -2,7 +2,21 @@
 
 Ce guide décrit les étapes pour installer **OpenDocker** (basé sur Pyrodactyl) sur une machine virtuelle (Ubuntu 22.04/24.04 recommandé).
 
-## 1. Préparer le système et installer les dépendances
+## 🚀 Installation Rapide (Automatisée)
+
+Si vous êtes sur une installation fraîche d'Ubuntu, vous pouvez utiliser notre script d'installation automatisé qui s'occupe de TOUT (PHP, MariaDB, Redis, Nginx, Base de données, etc.) :
+
+```bash
+# Donnez les permissions d'exécution
+chmod +x setup.sh
+
+# Lancez l'installation (en tant que root)
+sudo ./setup.sh
+```
+
+---
+
+## 🛠️ Guide d'Installation Manuelle (Pas à Pas)
 
 ```bash
 # Mettre à jour le système

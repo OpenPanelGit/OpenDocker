@@ -8,11 +8,11 @@ err() { echo -e "\n\033[1;31m!! $*\033[0m" >&2; }
 export DEBIAN_FRONTEND=noninteractive
 
 log Checking and updating OS packages
-if [ ! -f /var/lib/pterodactyl-provision/packages-updated ]; then
+if [ ! -f /var/lib/openpanel-provision/packages-updated ]; then
   apt-get update -y
   apt-get upgrade -y
-  mkdir -p /var/lib/pterodactyl-provision
-  touch /var/lib/pterodactyl-provision/packages-updated
+  mkdir -p /var/lib/openpanel-provision
+  touch /var/lib/openpanel-provision/packages-updated
 else
   log "OS packages already updated, skipping"
 fi
@@ -42,10 +42,10 @@ apt-get install -y redis-server
 systemctl enable --now redis-server
 
 log Adding PHP 8.4 repository
-if [ ! -f /var/lib/pterodactyl-provision/php-repo-added ]; then
+if [ ! -f /var/lib/openpanel-provision/php-repo-added ]; then
   add-apt-repository -y ppa:ondrej/php
   apt-get update -y
-  touch /var/lib/pterodactyl-provision/php-repo-added
+  touch /var/lib/openpanel-provision/php-repo-added
 else
   log "PHP repository already added, skipping"
 fi
@@ -57,11 +57,11 @@ apt-get install -y \
   php8.4-simplexml php8.4-dom
 
 log Configuring PHP-FPM pool
-cat >/etc/php/8.4/fpm/pool.d/pterodactyl.conf <<EOF
-[pterodactyl]
+cat >/etc/php/8.4/fpm/pool.d/openpanel.conf <<EOF
+[openpanel]
 user = vagrant
 group = vagrant
-listen = /run/php/pterodactyl.sock
+listen = /run/php/openpanel.sock
 listen.owner = www-data
 listen.group = www-data
 listen.mode = 0660
@@ -106,11 +106,11 @@ else
   sed -i '1i user vagrant;' /etc/nginx/nginx.conf
 fi
 
-cat >/etc/nginx/sites-available/pterodactyl.conf <<'EOF'
+cat >/etc/nginx/sites-available/openpanel.conf <<'EOF'
 server {
     listen 3000;
     server_name localhost;
-    root /home/vagrant/pyrodactyl/public;
+    root /home/vagrant/opendocker/public;
     index index.php index.html;
     charset utf-8;
     location / {
@@ -119,7 +119,7 @@ server {
     location = /favicon.ico { access_log off; log_not_found off; }
     location = /robots.txt  { access_log off; log_not_found off; }
     access_log off;
-    error_log  /var/log/nginx/pterodactyl.app-error.log error;
+    error_log  /var/log/nginx/openpanel.app-error.log error;
     client_max_body_size 100m;
     client_body_timeout 120s;
     sendfile off;
@@ -127,7 +127,7 @@ server {
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_param HTTP_PROXY "";
-        fastcgi_pass unix:/run/php/pterodactyl.sock;
+        fastcgi_pass unix:/run/php/openpanel.sock;
         fastcgi_read_timeout 300;
         fastcgi_send_timeout 300;
         fastcgi_connect_timeout 300;
@@ -138,7 +138,7 @@ server {
 }
 EOF
 
-ln -sf /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf
+ln -sf /etc/nginx/sites-available/openpanel.conf /etc/nginx/sites-enabled/openpanel.conf
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl enable --now nginx
@@ -147,7 +147,7 @@ log Installing MariaDB
 apt-get install -y mariadb-server mariadb-client
 
 log Configuring MariaDB
-cat >/etc/mysql/mariadb.conf.d/99-pterodactyl.cnf <<EOF
+cat >/etc/mysql/mariadb.conf.d/99-openpanel.cnf <<EOF
 [mysqld]
 bind-address = 0.0.0.0
 port = 3306
@@ -164,12 +164,12 @@ systemctl restart mariadb
 log Creating databases and users
 mysql -u root <<SQL
 CREATE DATABASE IF NOT EXISTS panel;
-CREATE USER IF NOT EXISTS 'pterodactyl'@'localhost' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON panel.* TO 'pterodactyl'@'localhost' WITH GRANT OPTION;
-CREATE USER IF NOT EXISTS 'pterodactyluser'@'localhost' IDENTIFIED BY 'password';
-CREATE USER IF NOT EXISTS 'pterodactyluser'@'%' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON *.* TO 'pterodactyluser'@'localhost' WITH GRANT OPTION;
-GRANT ALL PRIVILEGES ON *.* TO 'pterodactyluser'@'%' WITH GRANT OPTION;
+CREATE USER IF NOT EXISTS 'openpanel'@'localhost' IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON panel.* TO 'openpanel'@'localhost' WITH GRANT OPTION;
+CREATE USER IF NOT EXISTS 'openpaneluser'@'localhost' IDENTIFIED BY 'password';
+CREATE USER IF NOT EXISTS 'openpaneluser'@'%' IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON *.* TO 'openpaneluser'@'localhost' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'openpaneluser'@'%' WITH GRANT OPTION;
 CREATE USER IF NOT EXISTS 'dbhost'@'localhost' IDENTIFIED BY 'dbhostpassword';
 CREATE USER IF NOT EXISTS 'dbhost'@'%' IDENTIFIED BY 'dbhostpassword';
 GRANT ALL PRIVILEGES ON *.* TO 'dbhost'@'localhost' WITH GRANT OPTION;
@@ -184,7 +184,7 @@ if ! command -v composer >/dev/null 2>&1; then
   rm -f /tmp/composer-setup.php
 fi
 
-pushd /home/vagrant/pyrodactyl >/dev/null
+pushd /home/vagrant/opendocker >/dev/null
 [ -f .env ] || cp .env.example .env
 
 sudo -u vagrant mkdir -p storage/framework/cache
@@ -194,7 +194,7 @@ sudo -u vagrant mkdir -p storage/logs
 sudo -u vagrant mkdir -p bootstrap/cache
 
 log Composer install
-sudo -u vagrant -H bash -lc 'cd /home/vagrant/pyrodactyl && composer install --no-dev --optimize-autoloader'
+sudo -u vagrant -H bash -lc 'cd /home/vagrant/opendocker && composer install --no-dev --optimize-autoloader'
 chmod -R 755 storage bootstrap/cache
 setfacl -Rm u:vagrant:rwX storage bootstrap/cache >/dev/null 2>&1 || true
 chown -R vagrant:vagrant storage bootstrap/cache
@@ -202,7 +202,7 @@ chown -R vagrant:vagrant storage bootstrap/cache
 # helper (append --no-interaction automatically; avoid quoted, spaced values)
 artisan() {
   sudo -u vagrant -H bash -lc \
-    "cd /home/vagrant/pyrodactyl && /usr/bin/php8.4 artisan $* --no-interaction"
+    "cd /home/vagrant/opendocker && /usr/bin/php8.4 artisan $* --no-interaction"
 }
 
 
@@ -211,19 +211,19 @@ if ! grep -qE '^APP_KEY=base64:.+' .env; then
   artisan key:generate --force
 fi
 
-artisan p:environment:setup -n --author dev@pyro.host --url http://localhost:3000 \
-  --timezone America/Chicago --cache redis --session redis --queue redis \
+artisan p:environment:setup -n --author dev@openpanel.dev --url http://localhost:3000 \
+  --timezone UTC --cache redis --session redis --queue redis \
   --settings-ui=true --redis-host 127.0.0.1 --redis-pass null --redis-port 6379
 
 artisan p:environment:database -n --host 127.0.0.1 --port 3306 \
-  --database panel --username pterodactyl --password password
+  --database panel --username openpanel --password password
 artisan migrate --seed --force
 
 log Ensuring developer user exists
-if ! mysql -u root -D panel -N -B -e "SELECT id FROM users WHERE email='dev@pyro.host' LIMIT 1;" | grep -q .; then
-  artisan p:user:make -n --email dev@pyro.host --username dev --name-first Developer --name-last User --password dev || true
+if ! mysql -u root -D panel -N -B -e "SELECT id FROM users WHERE email='dev@openpanel.dev' LIMIT 1;" | grep -q .; then
+  artisan p:user:make -n --email dev@openpanel.dev --username dev --name-first Developer --name-last User --password dev || true
 fi
-mysql -u root -e "UPDATE panel.users SET root_admin = 1 WHERE email='dev@pyro.host'"
+mysql -u root -e "UPDATE panel.users SET root_admin = 1 WHERE email='dev@openpanel.dev'"
 
 log Ensuring location exists
 # ensure location and get its id
@@ -266,22 +266,22 @@ fi
 popd >/dev/null
 
 log Installing Laravel scheduler cron
-( crontab -l 2>/dev/null | grep -v 'pterodactyl/artisan schedule:run' || true
-  echo '* * * * * php /home/vagrant/pyrodactyl/artisan schedule:run >> /dev/null 2>&1'
+( crontab -l 2>/dev/null | grep -v 'opendocker/artisan schedule:run' || true
+  echo '* * * * * php /home/vagrant/opendocker/artisan schedule:run >> /dev/null 2>&1'
 ) | crontab -
 
 log Creating pteroq.service
 cat >/etc/systemd/system/pteroq.service <<EOF
 [Unit]
-Description=Pterodactyl Queue Worker
+Description=OpenPanel Queue Worker
 After=redis-server.service
 Requires=redis-server.service
 [Service]
 User=vagrant
 Group=vagrant
-WorkingDirectory=/home/vagrant/pyrodactyl
+WorkingDirectory=/home/vagrant/opendocker
 Restart=always
-ExecStart=/usr/bin/php /home/vagrant/pyrodactyl/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3
+ExecStart=/usr/bin/php /home/vagrant/opendocker/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3
 StartLimitBurst=30
 RestartSec=5s
 [Install]
