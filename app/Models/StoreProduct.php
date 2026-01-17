@@ -16,6 +16,14 @@ namespace Pterodactyl\Models;
 class StoreProduct extends Model
 {
     /**
+     * @return string
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'id';
+    }
+
+    /**
      * The table associated with the model.
      *
      * @var string
