@@ -1,9 +1,9 @@
 import { Ellipsis, Gear, House, Key, Lock, Plus, Tag } from '@gravity-ui/icons';
 import { useStoreState } from 'easy-peasy';
-import { Fragment, Suspense, useEffect, useRef, useState } from 'react';
+import { Fragment, Suspense, useEffect, useRef, useState, lazy } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 
-import routes from '@/routers/routes';
+
 
 import DashboardContainer from '@/components/dashboard/DashboardContainer';
 import {
@@ -23,6 +23,11 @@ import StoreContainer from '@/components/store/StoreContainer';
 import CreateServerContainer from '@/components/dashboard/CreateServerContainer';
 
 import http from '@/api/http';
+
+const AccountOverviewContainer = lazy(() => import('@/components/dashboard/AccountOverviewContainer'));
+const AccountApiContainer = lazy(() => import('@/components/dashboard/AccountApiContainer'));
+const AccountSSHContainer = lazy(() => import('@/components/dashboard/ssh/AccountSSHContainer'));
+const ActivityLogContainer = lazy(() => import('@/components/dashboard/activity/ActivityLogContainer'));
 
 const DashboardRouter = () => {
     const location = useLocation();
@@ -191,13 +196,10 @@ const DashboardRouter = () => {
                             <Routes>
                                 <Route path='' element={<DashboardContainer />} />
 
-                                {routes?.account && Array.isArray(routes.account) && routes.account.map(({ route, component: Component }) => (
-                                    <Route
-                                        key={route}
-                                        path={`/account/${route}`.replace('//', '/')}
-                                        element={<Component />}
-                                    />
-                                ))}
+                                <Route path='/account' element={<AccountOverviewContainer />} />
+                                <Route path='/account/api' element={<AccountApiContainer />} />
+                                <Route path='/account/ssh' element={<AccountSSHContainer />} />
+                                <Route path='/account/activity' element={<ActivityLogContainer />} />
 
                                 <Route path='/store' element={<StoreContainer />} />
                                 <Route path='/create' element={<CreateServerContainer />} />

@@ -80,7 +80,7 @@ class StoreController extends ClientApiController
      */
     public function afk(ClientApiRequest $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user()->fresh();
         $now = now();
         $settings = app(SettingsRepositoryInterface::class);
         
