@@ -145,20 +145,20 @@ const DashboardRouter = () => {
                         </DropdownMenu>
                     </div>
                     <div aria-hidden className='mt-8 mb-4 bg-[#ffffff33] min-h-[1px] w-6'></div>
-                    <ul data-openpanel-subnav-routes-wrapper='' className='openpanel-subnav-routes-wrapper'>
-                        <NavLink to={'/'} end className='flex flex-row items-center' ref={NavigationHome}>
+                    <ul data-openpanel-subnav-routes-wrapper='' className='flex flex-col openpanel-subnav-routes-wrapper'>
+                        <NavLink to={'/'} end className='flex flex-row items-center px-4 py-3 gap-x-3 font-semibold' ref={NavigationHome}>
                             <House width={22} height={22} fill='currentColor' />
                             <p>Servers</p>
                         </NavLink>
-                        <NavLink to={'/account/api'} end className='flex flex-row items-center' ref={NavigationApi}>
+                        <NavLink to={'/account/api'} end className='flex flex-row items-center px-4 py-3 gap-x-3 font-semibold' ref={NavigationApi}>
                             <Lock width={22} height={22} fill='currentColor' />
                             <p>API Keys</p>
                         </NavLink>
-                        <NavLink to={'/account/ssh'} end className='flex flex-row items-center' ref={NavigationSSH}>
+                        <NavLink to={'/account/ssh'} end className='flex flex-row items-center px-4 py-3 gap-x-3 font-semibold' ref={NavigationSSH}>
                             <Key width={22} height={22} fill='currentColor' />
                             <p>SSH Keys</p>
                         </NavLink>
-                        <NavLink to={'/account'} end className='flex flex-row items-center' ref={NavigationSettings}>
+                        <NavLink to={'/account'} end className='flex flex-row items-center px-4 py-3 gap-x-3 font-semibold' ref={NavigationSettings}>
                             <Gear width={22} height={22} fill='currentColor' />
                             <p>Settings</p>
                         </NavLink>

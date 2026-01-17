@@ -75,7 +75,7 @@ const ServerSidebarNavItem = forwardRef<HTMLAnchorElement, ServerSidebarNavItemP
                 to={to}
                 end={end}
                 onClick={onClick}
-                className='flex flex-row items-center transition-colors duration-200 hover:bg-[#ffffff11] rounded-md'
+                className='flex flex-row items-center px-4 py-3 gap-x-3 font-semibold transition-colors duration-200 hover:bg-[#ffffff11] rounded-md'
             >
                 {Icon && <Icon width={22} height={22} fill='currentColor' />}
                 <p>{name}</p>
