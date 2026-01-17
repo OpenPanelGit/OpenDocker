@@ -1,4 +1,4 @@
-import { Ellipsis, Gear, House, Key, Lock, Tag } from '@gravity-ui/icons';
+import { Ellipsis, Gear, House, Key, Lock, Plus, Tag } from '@gravity-ui/icons';
 import { useStoreState } from 'easy-peasy';
 import { Fragment, Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
@@ -21,7 +21,6 @@ import Logo from '@/components/elements/PyroLogo';
 import { NotFound } from '@/components/elements/ScreenBlock';
 import StoreContainer from '@/components/store/StoreContainer';
 import CreateServerContainer from '@/components/dashboard/CreateServerContainer';
-import { Database } from '@gravity-ui/icons';
 
 import http from '@/api/http';
 
@@ -57,6 +56,7 @@ const DashboardRouter = () => {
     const NavigationApi = useRef(null);
     const NavigationSSH = useRef(null);
     const NavigationStore = useRef(null);
+    const NavigationCreate = useRef(null);
 
     const calculateTop = (pathname: string) => {
         // Get currents of navigation refs.
@@ -76,6 +76,8 @@ const DashboardRouter = () => {
         if (pathname.endsWith('/ssh') && ButtonSSH != null) return (ButtonSSH as any).offsetTop + HighlightOffset;
         if (pathname.endsWith('/store') && NavigationStore.current != null)
             return (NavigationStore.current as any).offsetTop + HighlightOffset;
+        if (pathname.endsWith('/create') && NavigationCreate.current != null)
+            return (NavigationCreate.current as any).offsetTop + HighlightOffset;
         return '0';
     };
 
@@ -172,23 +174,11 @@ const DashboardRouter = () => {
                             <Tag width={22} height={22} fill='currentColor' />
                             <p>Store</p>
                         </NavLink>
+                        <NavLink to={'/create'} end className='flex flex-row items-center px-4 py-3 gap-x-3 font-semibold' ref={NavigationCreate}>
+                            <Plus width={22} height={22} fill='currentColor' />
+                            <p>Create Server</p>
+                        </NavLink>
                     </ul>
-
-                    <div className='mt-auto pt-8'>
-                        <div className='bg-brand/10 border border-brand/20 p-4 rounded-lg shadow-lg shadow-brand/5'>
-                            <div className='flex items-center gap-x-2 mb-1'>
-                                <Database width={16} height={16} className='text-brand' />
-                                <p className='text-xs text-white/40 uppercase font-black tracking-widest'>Your Balance</p>
-                            </div>
-                            <p className='text-xl font-bold text-white'>
-                                {Number(useStoreState(state => state.user.data?.coins || 0)).toFixed(2)}
-                                <span className='text-xs font-normal text-white/40 ml-1'>Coins</span>
-                            </p>
-                            <div className='w-full h-1 bg-white/5 rounded-full mt-3 overflow-hidden'>
-                                <div className='h-full bg-brand w-1/3 animate-pulse'></div>
-                            </div>
-                        </div>
-                    </div>
                 </MainSidebar>
 
                 <Suspense fallback={null}>
@@ -217,7 +207,7 @@ const DashboardRouter = () => {
                     </MainWrapper>
                 </Suspense>
             </div>
-        </Fragment>
+        </Fragment >
     );
 };
 
