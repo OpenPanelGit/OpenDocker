@@ -1,7 +1,7 @@
 import { hashToPath } from '@/helpers';
 import { useVirtualizer } from '@tanstack/react-virtual';
+// @ts-expect-error - Debounce type mismatch
 import debounce from 'debounce';
-import { For } from 'million/react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 

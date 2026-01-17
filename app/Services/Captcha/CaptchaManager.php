@@ -25,7 +25,7 @@ class CaptchaManager extends Manager
      */
     public function getDefaultDriver(): string
     {
-        return $this->settings->get('settings::pterodactyl:captcha:provider', 'none');
+        return $this->settings->get('settings::openpanel:captcha:provider', 'none');
     }
 
     /**
@@ -42,8 +42,8 @@ class CaptchaManager extends Manager
     public function createTurnstileDriver(): TurnstileProvider
     {
         return new TurnstileProvider([
-            'site_key' => config('pterodactyl.captcha.turnstile.site_key', ''),
-            'secret_key' => config('pterodactyl.captcha.turnstile.secret_key', ''),
+            'site_key' => config('openpanel.captcha.turnstile.site_key', ''),
+            'secret_key' => config('openpanel.captcha.turnstile.secret_key', ''),
         ]);
     }
 
@@ -53,8 +53,8 @@ class CaptchaManager extends Manager
     public function createHcaptchaDriver(): HCaptchaProvider
     {
         return new HCaptchaProvider([
-            'site_key' => config('pterodactyl.captcha.hcaptcha.site_key', ''),
-            'secret_key' => config('pterodactyl.captcha.hcaptcha.secret_key', ''),
+            'site_key' => config('openpanel.captcha.hcaptcha.site_key', ''),
+            'secret_key' => config('openpanel.captcha.hcaptcha.secret_key', ''),
         ]);
     }
 
@@ -64,8 +64,8 @@ class CaptchaManager extends Manager
     public function createRecaptchaDriver(): RecaptchaProvider
     {
         return new RecaptchaProvider([
-            'site_key' => config('pterodactyl.captcha.recaptcha.site_key', ''),
-            'secret_key' => config('pterodactyl.captcha.recaptcha.secret_key', ''),
+            'site_key' => config('openpanel.captcha.recaptcha.site_key', ''),
+            'secret_key' => config('openpanel.captcha.recaptcha.secret_key', ''),
         ]);
     }
 

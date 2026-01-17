@@ -2,7 +2,7 @@ import react from '@vitejs/plugin-react-swc';
 import * as child from 'child_process';
 import fs from 'fs';
 import laravel from 'laravel-vite-plugin';
-import million from 'million/compiler';
+
 import { fileURLToPath } from 'node:url';
 import path from 'path';
 import { dirname, resolve } from 'pathe';
@@ -83,12 +83,12 @@ export default defineConfig({
     plugins: [
         laravel('resources/scripts/index.tsx'),
         manifestSRI(),
-        million.vite({
-            auto: {
-                threshold: 0.01,
-            },
-            telemetry: false,
-        }),
+        // million.vite({
+        //     auto: {
+        //         threshold: 0.01,
+        //     },
+        //     telemetry: false,
+        // }),
         react(),
     ],
 

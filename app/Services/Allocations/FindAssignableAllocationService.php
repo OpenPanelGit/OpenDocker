@@ -30,7 +30,7 @@ class FindAssignableAllocationService
      */
     public function handle(Server $server): Allocation
     {
-        if (!config('pterodactyl.client_features.allocations.enabled')) {
+        if (!config('openpanel.client_features.allocations.enabled')) {
             throw new AutoAllocationNotEnabledException();
         }
 
@@ -86,8 +86,8 @@ class FindAssignableAllocationService
      */
     protected function createNewAllocation(Server $server, string $resolvedIp): Allocation
     {
-        $start = config('pterodactyl.client_features.allocations.range_start', null);
-        $end = config('pterodactyl.client_features.allocations.range_end', null);
+        $start = config('openpanel.client_features.allocations.range_start', null);
+        $end = config('openpanel.client_features.allocations.range_end', null);
 
         if (!$start || !$end) {
             throw new NoAutoAllocationSpaceAvailableException();

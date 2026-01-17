@@ -102,7 +102,7 @@ const UploadButton = () => {
                     className='flex'
                     onClick={() => setVisible(false)}
                     onDragOver={(e) => e.preventDefault()}
-                    // why doesn't vanilla pterodactyl have this?
+                    // why doesn't vanilla openpanel have this?
                     onDragLeave={() => {
                         setVisible(false);
                     }}

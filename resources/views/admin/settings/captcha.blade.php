@@ -27,9 +27,9 @@
               <div class="form-group col-md-4">
                 <label class="control-label">Provider</label>
                 <div>
-                  <select name="pterodactyl:captcha:provider" class="form-control" id="captcha-provider">
+                  <select name="openpanel:captcha:provider" class="form-control" id="captcha-provider">
                     @foreach($providers as $key => $name)
-                      <option value="{{ $key }}" @if(old('pterodactyl:captcha:provider', config('pterodactyl.captcha.provider', 'none')) === $key) selected @endif>{{ $name }}</option>
+                      <option value="{{ $key }}" @if(old('openpanel:captcha:provider', config('openpanel.captcha.provider', 'none')) === $key) selected @endif>{{ $name }}</option>
                     @endforeach
                   </select>
                   <p class="text-muted"><small>Select the captcha provider to use for authentication forms.</small></p>
@@ -48,16 +48,16 @@
               <div class="form-group col-md-6">
                 <label class="control-label">Site Key</label>
                 <div>
-                  <input type="text" class="form-control" name="pterodactyl:captcha:turnstile:site_key"
-                    value="{{ old('pterodactyl:captcha:turnstile:site_key', config('pterodactyl.captcha.turnstile.site_key', '')) }}" />
+                  <input type="text" class="form-control" name="openpanel:captcha:turnstile:site_key"
+                    value="{{ old('openpanel:captcha:turnstile:site_key', config('openpanel.captcha.turnstile.site_key', '')) }}" />
                   <p class="text-muted"><small>The site key provided by Cloudflare Turnstile. This is used in the frontend widget.</small></p>
                 </div>
               </div>
               <div class="form-group col-md-6">
                 <label class="control-label">Secret Key</label>
                 <div>
-                  <input type="password" class="form-control" name="pterodactyl:captcha:turnstile:secret_key"
-                    value="{{ old('pterodactyl:captcha:turnstile:secret_key', config('pterodactyl.captcha.turnstile.secret_key', '')) }}" />
+                  <input type="password" class="form-control" name="openpanel:captcha:turnstile:secret_key"
+                    value="{{ old('openpanel:captcha:turnstile:secret_key', config('openpanel.captcha.turnstile.secret_key', '')) }}" />
                   <p class="text-muted"><small>The secret key provided by Cloudflare Turnstile. This is used for server-side verification.</small></p>
                 </div>
               </div>
@@ -88,16 +88,16 @@
               <div class="form-group col-md-6">
                 <label class="control-label">Site Key</label>
                 <div>
-                  <input type="text" class="form-control" name="pterodactyl:captcha:hcaptcha:site_key"
-                    value="{{ old('pterodactyl:captcha:hcaptcha:site_key', config('pterodactyl.captcha.hcaptcha.site_key', '')) }}" />
+                  <input type="text" class="form-control" name="openpanel:captcha:hcaptcha:site_key"
+                    value="{{ old('openpanel:captcha:hcaptcha:site_key', config('openpanel.captcha.hcaptcha.site_key', '')) }}" />
                   <p class="text-muted"><small>The site key provided by hCaptcha. This is used in the frontend widget.</small></p>
                 </div>
               </div>
               <div class="form-group col-md-6">
                 <label class="control-label">Secret Key</label>
                 <div>
-                  <input type="password" class="form-control" name="pterodactyl:captcha:hcaptcha:secret_key"
-                    value="{{ old('pterodactyl:captcha:hcaptcha:secret_key', config('pterodactyl.captcha.hcaptcha.secret_key', '')) }}" />
+                  <input type="password" class="form-control" name="openpanel:captcha:hcaptcha:secret_key"
+                    value="{{ old('openpanel:captcha:hcaptcha:secret_key', config('openpanel.captcha.hcaptcha.secret_key', '')) }}" />
                   <p class="text-muted"><small>The secret key provided by hCaptcha. This is used for server-side verification.</small></p>
                 </div>
               </div>
@@ -128,16 +128,16 @@
               <div class="form-group col-md-6">
                 <label class="control-label">Site Key</label>
                 <div>
-                  <input type="text" class="form-control" name="pterodactyl:captcha:recaptcha:site_key"
-                    value="{{ old('pterodactyl:captcha:recaptcha:site_key', config('pterodactyl.captcha.recaptcha.site_key', '')) }}" />
+                  <input type="text" class="form-control" name="openpanel:captcha:recaptcha:site_key"
+                    value="{{ old('openpanel:captcha:recaptcha:site_key', config('openpanel.captcha.recaptcha.site_key', '')) }}" />
                   <p class="text-muted"><small>The site key provided by Google reCAPTCHA v3. This is used in the frontend integration.</small></p>
                 </div>
               </div>
               <div class="form-group col-md-6">
                 <label class="control-label">Secret Key</label>
                 <div>
-                  <input type="password" class="form-control" name="pterodactyl:captcha:recaptcha:secret_key"
-                    value="{{ old('pterodactyl:captcha:recaptcha:secret_key', config('pterodactyl.captcha.recaptcha.secret_key', '')) }}" />
+                  <input type="password" class="form-control" name="openpanel:captcha:recaptcha:secret_key"
+                    value="{{ old('openpanel:captcha:recaptcha:secret_key', config('openpanel.captcha.recaptcha.secret_key', '')) }}" />
                   <p class="text-muted"><small>The secret key provided by Google reCAPTCHA v3. This is used for server-side verification.</small></p>
                 </div>
               </div>
