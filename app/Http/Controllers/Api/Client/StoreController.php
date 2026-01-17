@@ -21,7 +21,7 @@ class StoreController extends ClientApiController
         return [
             'success' => true,
             'products' => StoreProduct::where('enabled', true)->get(),
-            'balance' => $request->user()->coins,
+            'balance' => (float) $request->user()->coins,
             'rate' => (float) ($settings->get('store:afk_rate') ?? 0.1),
         ];
     }
@@ -71,7 +71,7 @@ class StoreController extends ClientApiController
         return new JsonResponse([
             'success' => true,
             'message' => 'Achat réussi !',
-            'balance' => $user->coins,
+            'balance' => (float) $user->coins,
         ]);
     }
 
@@ -89,7 +89,7 @@ class StoreController extends ClientApiController
         
         if (!$user->last_afk_gain) {
             $user->update(['last_afk_gain' => $now]);
-            return new JsonResponse(['success' => true, 'balance' => $user->coins, 'rate' => $earningRate]);
+            return new JsonResponse(['success' => true, 'balance' => (float) $user->coins, 'rate' => $earningRate]);
         }
 
         $diffInSeconds = $now->diffInSeconds($user->last_afk_gain);
@@ -97,17 +97,18 @@ class StoreController extends ClientApiController
         // Award coins for any amount of time passed (per second precision)
         if ($diffInSeconds >= 1) {
             $gain = ($diffInSeconds / 60) * $earningRate;
-            $user->increment('coins', $gain);
-            $user->update(['last_afk_gain' => $now]);
+            $user->coins += $gain;
+            $user->last_afk_gain = $now;
+            $user->save();
             
             return new JsonResponse([
                 'success' => true,
-                'gain' => $gain,
-                'balance' => $user->coins,
+                'gain' => (float) $gain,
+                'balance' => (float) $user->coins,
                 'rate' => $earningRate,
             ]);
         }
 
-        return new JsonResponse(['success' => true, 'balance' => $user->coins, 'rate' => $earningRate]);
+        return new JsonResponse(['success' => true, 'balance' => (float) $user->coins, 'rate' => $earningRate]);
     }
 }

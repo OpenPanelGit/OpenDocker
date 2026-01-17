@@ -42,9 +42,10 @@ const StoreBackground = () => {
         const tickInterval = setInterval(() => {
             const u = userRef.current;
             if (u && u.rate > 0) {
-                // local visual bump
+                // local visual bump - FORCE NUMBER CAST to prevent string concatenation
+                const currentCoins = Number(u.coins);
                 const increment = u.rate / 60;
-                updateUserData({ coins: u.coins + increment });
+                updateUserData({ coins: currentCoins + increment });
             }
         }, 1000);
 

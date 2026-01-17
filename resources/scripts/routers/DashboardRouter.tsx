@@ -3,7 +3,7 @@ import { useStoreState } from 'easy-peasy';
 import { Fragment, Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 
-import { routes } from '@/routers/routes';
+import routes from '@/routers/routes';
 
 import DashboardContainer from '@/components/dashboard/DashboardContainer';
 import {

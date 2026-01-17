@@ -264,7 +264,6 @@ const routes: Routes = {
     ],
 };
 
-export { routes };
 export default routes;
 
 /**
