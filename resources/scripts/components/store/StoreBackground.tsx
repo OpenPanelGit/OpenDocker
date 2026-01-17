@@ -1,40 +1,61 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStoreActions, useStoreState } from '@/state/hooks';
 import http from '@/api/http';
 
 const StoreBackground = () => {
     const updateUserData = useStoreActions((actions) => actions.user.updateUserData);
     const user = useStoreState((state) => state.user.data);
+    const userRef = useRef(user);
+
+    // Keep the ref updated with the latest user data (balance, rate, etc.)
+    // but DON'T restart the interval effect below when user changes.
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
 
     useEffect(() => {
-        console.log('[Store] Background active. Rate:', user?.rate, 'Coins:', user?.coins);
+        // Initial safety check
+        if (!userRef.current) return;
 
-        // 1. Per-second smooth visual bump
-        const tickInterval = setInterval(() => {
-            if (user && user.rate > 0) {
-                // Increment local balance by rate/60
-                const increment = user.rate / 60;
-                updateUserData({ coins: user.coins + increment });
-            }
-        }, 1000);
+        console.log('[Store] Background worker started.');
 
-        // 2. Per-minute server sync
-        const syncInterval = setInterval(() => {
+        const sync = () => {
             http.post('/api/client/store/afk')
                 .then(({ data }) => {
                     if (data.success) {
-                        updateUserData({ coins: Number(data.balance), rate: Number(data.rate) });
-                        if (data.gain) console.log(`[Store] Sync réussi ! Gain validé: ${data.gain}. Solde actuel: ${data.balance}`);
+                        updateUserData({
+                            coins: Number(data.balance),
+                            rate: Number(data.rate)
+                        });
+                        if (data.gain) {
+                            console.log(`[Store] Sync complete. Gained: ${data.gain.toFixed(4)}. Total: ${data.balance}`);
+                        }
                     }
                 })
-                .catch((error) => console.error('AFK sync failed:', error));
-        }, 60000);
+                .catch((error) => console.error('[Store] Sync failed:', error));
+        };
+
+        // 1. Initial sync on load to set start time and catch up
+        sync();
+
+        // 2. Per-second smooth visual increment
+        const tickInterval = setInterval(() => {
+            const u = userRef.current;
+            if (u && u.rate > 0) {
+                // local visual bump
+                const increment = u.rate / 60;
+                updateUserData({ coins: u.coins + increment });
+            }
+        }, 1000);
+
+        // 3. Regular server synchronization (every 30s for better persistence)
+        const syncInterval = setInterval(sync, 10000);
 
         return () => {
             clearInterval(tickInterval);
             clearInterval(syncInterval);
         };
-    }, [user?.rate, user?.coins]);
+    }, []); // Empty dependency array means this ONLY runs once on mount
 
     return null;
 };

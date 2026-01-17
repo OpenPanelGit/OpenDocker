@@ -100,7 +100,7 @@ const CreateServerContainer = () => {
     const { addFlash } = useFlash();
     const [loading, setLoading] = useState(true);
     const [nests, setNests] = useState<Nest[]>([]);
-    const user = useStoreState((state) => state.user.data!);
+    const user = useStoreState((state) => state.user.data);
 
     useEffect(() => {
         http.get('/api/client/nests')
@@ -121,7 +121,7 @@ const CreateServerContainer = () => {
             });
     };
 
-    if (loading) return <Spinner centered />;
+    if (loading || !user) return <Spinner centered />;
 
     return (
         <PageContentBlock title={'Créer un Serveur'} showFlashKey={'create-server'}>
@@ -141,7 +141,7 @@ const CreateServerContainer = () => {
                         <ResourceBox>
                             <Cpu width={20} height={20} />
                             <p className='text-xs text-white/40 uppercase font-bold'>CPU</p>
-                            <p className='text-xl font-bold'>{user?.boughtCpu || 0}%</p>
+                            <p className='text-xl font-bold'>{user!.boughtCpu || 0}%</p>
                         </ResourceBox>
                         <ResourceBox>
                             <Layers width={20} height={20} />

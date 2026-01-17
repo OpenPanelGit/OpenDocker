@@ -94,9 +94,9 @@ class StoreController extends ClientApiController
 
         $diffInSeconds = $now->diffInSeconds($user->last_afk_gain);
         
-        if ($diffInSeconds >= 60) {
-            $minutes = floor($diffInSeconds / 60);
-            $gain = $minutes * $earningRate;
+        // Award coins for any amount of time passed (per second precision)
+        if ($diffInSeconds >= 1) {
+            $gain = ($diffInSeconds / 60) * $earningRate;
             $user->increment('coins', $gain);
             $user->update(['last_afk_gain' => $now]);
             

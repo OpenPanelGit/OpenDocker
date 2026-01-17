@@ -191,7 +191,7 @@ const DashboardRouter = () => {
                             <Routes>
                                 <Route path='' element={<DashboardContainer />} />
 
-                                {Array.isArray(routes.account) && routes.account.map(({ route, component: Component }) => (
+                                {routes?.account && Array.isArray(routes.account) && routes.account.map(({ route, component: Component }) => (
                                     <Route
                                         key={route}
                                         path={`/account/${route}`.replace('//', '/')}
