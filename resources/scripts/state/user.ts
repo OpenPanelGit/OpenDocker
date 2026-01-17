@@ -18,6 +18,7 @@ export interface UserData {
     boughtSlots: number;
     boughtDatabases: number;
     boughtBackups: number;
+    rate: number;
 }
 
 export interface UserStore {

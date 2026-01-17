@@ -208,7 +208,11 @@ class User extends Model implements
      */
     public function toVueObject(): array
     {
-        return Collection::make($this->toArray())->except(['id', 'external_id'])->toArray();
+        $settings = app(\Pterodactyl\Contracts\Repository\SettingsRepositoryInterface::class);
+        $data = Collection::make($this->toArray())->except(['id', 'external_id'])->toArray();
+        $data['rate'] = (float) ($settings->get('store:afk_rate') ?? 0.1);
+
+        return $data;
     }
 
     /**

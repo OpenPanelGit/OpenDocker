@@ -7,8 +7,8 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\StoreProduct;
 use Illuminate\Http\JsonResponse;
 use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
-use Pterodactyl\Exceptions\Http\HttpForbiddenException;
 use Pterodactyl\Exceptions\Model\DataValidationException;
+use Pterodactyl\Contracts\Repository\SettingsRepositoryInterface;
 
 class StoreController extends ClientApiController
 {
@@ -17,10 +17,12 @@ class StoreController extends ClientApiController
      */
     public function index(ClientApiRequest $request): array
     {
+        $settings = app(SettingsRepositoryInterface::class);
         return [
             'success' => true,
             'products' => StoreProduct::where('enabled', true)->get(),
             'balance' => $request->user()->coins,
+            'rate' => (float) ($settings->get('store:afk_rate') ?? 0.1),
         ];
     }
 
@@ -80,19 +82,21 @@ class StoreController extends ClientApiController
     {
         $user = $request->user();
         $now = now();
+        $settings = app(SettingsRepositoryInterface::class);
         
         // Earning rate (coins per minute) - Default to 0.1 if not set
-        $earningRate = (float) ($this->settings->get('store:afk_rate') ?? 0.1);
+        $earningRate = (float) ($settings->get('store:afk_rate') ?? 0.1);
         
         if (!$user->last_afk_gain) {
             $user->update(['last_afk_gain' => $now]);
-            return new JsonResponse(['success' => true, 'balance' => $user->coins]);
+            return new JsonResponse(['success' => true, 'balance' => $user->coins, 'rate' => $earningRate]);
         }
 
-        $diffInMinutes = $now->diffInMinutes($user->last_afk_gain);
+        $diffInSeconds = $now->diffInSeconds($user->last_afk_gain);
         
-        if ($diffInMinutes >= 1) {
-            $gain = $diffInMinutes * $earningRate;
+        if ($diffInSeconds >= 60) {
+            $minutes = floor($diffInSeconds / 60);
+            $gain = $minutes * $earningRate;
             $user->increment('coins', $gain);
             $user->update(['last_afk_gain' => $now]);
             
@@ -100,9 +104,10 @@ class StoreController extends ClientApiController
                 'success' => true,
                 'gain' => $gain,
                 'balance' => $user->coins,
+                'rate' => $earningRate,
             ]);
         }
 
-        return new JsonResponse(['success' => true, 'balance' => $user->coins]);
+        return new JsonResponse(['success' => true, 'balance' => $user->coins, 'rate' => $earningRate]);
     }
 }

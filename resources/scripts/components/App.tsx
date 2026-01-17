@@ -38,6 +38,7 @@ interface ExtendedWindow extends Window {
         updated_at: string;
         created_at: string;
         coins: number;
+        rate: number;
         bought_cpu: number;
         bought_memory: number;
         bought_disk: number;
@@ -60,6 +61,7 @@ const App = () => {
             createdAt: new Date(OpenPanelUser.created_at),
             updatedAt: new Date(OpenPanelUser.updated_at),
             coins: OpenPanelUser.coins,
+            rate: OpenPanelUser.rate,
             boughtCpu: OpenPanelUser.bought_cpu,
             boughtMemory: OpenPanelUser.bought_memory,
             boughtDisk: OpenPanelUser.bought_disk,
