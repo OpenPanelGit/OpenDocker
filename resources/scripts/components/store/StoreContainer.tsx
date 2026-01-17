@@ -41,7 +41,7 @@ const StoreContainer = () => {
         http.get('/api/client/store')
             .then(({ data }) => {
                 setProducts(data.products);
-                setBalance(data.balance);
+                setBalance(Number(data.balance));
             })
             .catch((error) => {
                 console.error(error);
@@ -54,7 +54,7 @@ const StoreContainer = () => {
         http.post('/api/client/store/purchase', { product_id: productId })
             .then(({ data }) => {
                 addFlash({ type: 'success', message: data.message });
-                setBalance(data.balance);
+                setBalance(Number(data.balance));
             })
             .catch((error) => {
                 const message = error.response?.data?.error || 'Une erreur est survenue lors de l\'achat.';
@@ -85,7 +85,7 @@ const StoreContainer = () => {
                     </div>
                     <div className='text-right'>
                         <p className='text-sm text-white/50 uppercase tracking-wider font-semibold'>Votre Solde</p>
-                        <p className='text-3xl font-black text-brand'>{balance.toFixed(2)} <span className='text-lg font-normal opacity-70'>Coins</span></p>
+                        <p className='text-3xl font-black text-brand'>{Number(balance).toFixed(2)} <span className='text-lg font-normal opacity-70'>Coins</span></p>
                     </div>
                 </div>
 

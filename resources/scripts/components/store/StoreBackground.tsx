@@ -10,7 +10,7 @@ const StoreBackground = () => {
             http.post('/api/client/store/afk')
                 .then(({ data }) => {
                     if (data.success) {
-                        updateUserData({ coins: data.balance });
+                        updateUserData({ coins: Number(data.balance) });
                     }
                 })
                 .catch((error) => console.error('AFK gain failed:', error));

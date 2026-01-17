@@ -136,22 +136,22 @@ const CreateServerContainer = () => {
                         <ResourceBox className='active'>
                             <Server width={20} height={20} className='text-brand' />
                             <p className='text-xs text-white/40 uppercase font-bold'>Slots</p>
-                            <p className='text-xl font-bold'>{user.boughtSlots}</p>
+                            <p className='text-xl font-bold'>{user?.boughtSlots || 0}</p>
                         </ResourceBox>
                         <ResourceBox>
                             <Cpu width={20} height={20} />
                             <p className='text-xs text-white/40 uppercase font-bold'>CPU</p>
-                            <p className='text-xl font-bold'>{user.boughtCpu}%</p>
+                            <p className='text-xl font-bold'>{user?.boughtCpu || 0}%</p>
                         </ResourceBox>
                         <ResourceBox>
                             <Layers width={20} height={20} />
                             <p className='text-xs text-white/40 uppercase font-bold'>RAM</p>
-                            <p className='text-xl font-bold'>{user.boughtMemory}MB</p>
+                            <p className='text-xl font-bold'>{user?.boughtMemory || 0}MB</p>
                         </ResourceBox>
                         <ResourceBox>
                             <Folder width={20} height={20} />
                             <p className='text-xs text-white/40 uppercase font-bold'>Disk</p>
-                            <p className='text-xl font-bold'>{user.boughtDisk}MB</p>
+                            <p className='text-xl font-bold'>{user?.boughtDisk || 0}MB</p>
                         </ResourceBox>
                     </div>
                 )}
