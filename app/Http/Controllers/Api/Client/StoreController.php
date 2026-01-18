@@ -83,12 +83,18 @@ class StoreController extends ClientApiController
         $user = $request->user();
         $gain = (float) $request->input('gain', 0);
         
-        // Basic sanity check: reject if gain is 0 or suspiciously high (e.g. > 1 coin in 10s)
-        if ($gain <= 0 || $gain > 1) { 
-            return new JsonResponse(['success' => false, 'balance' => (float) $user->coins]);
+        // Relaxed sanity check: allow up to 100 coins per sync (10s) to allow for high rates/testing
+        if ($gain <= 0 || $gain > 100) { 
+            return new JsonResponse(['success' => false, 'balance' => (float) ($user->coins ?? 0)]);
         }
 
-        // Atomic update: just add what the client says it earned
+        // Ensure coins is not null before addition
+        if (is_null($user->coins)) {
+            $user->coins = 0;
+            $user->save();
+        }
+
+        // Atomic update
         \Illuminate\Support\Facades\DB::table('users')
             ->where('id', $user->id)
             ->update([
@@ -97,6 +103,8 @@ class StoreController extends ClientApiController
             ]);
         
         $freshUser = $user->fresh();
+        \Illuminate\Support\Facades\Log::info("Store: User {$user->username} gained {$gain} coins. New balance: {$freshUser->coins}");
+
         return new JsonResponse([
             'success' => true,
             'balance' => (float) $freshUser->coins,

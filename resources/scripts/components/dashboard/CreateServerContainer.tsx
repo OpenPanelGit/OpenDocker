@@ -108,14 +108,21 @@ const CreateServerContainer = () => {
                 // Handle Pterodactyl API response structure (data.data is the array)
                 const rawNests = Array.isArray(data) ? data : (data.data || []);
 
-                // Normalize nests to ensure eggs is always an array
-                const normalizedNests = rawNests.map((nest: any) => ({
-                    ...nest,
-                    attributes: nest.attributes || nest, // Fallback if flattened or not
-                    eggs: Array.isArray(nest.eggs)
-                        ? nest.eggs
-                        : (nest.eggs?.data || []) // Handle nested 'data' key for relationships
-                }));
+                // Normalize nests to ensure we handle Pterodactyl's nested attributes/relationships
+                const normalizedNests = rawNests.map((nest: any) => {
+                    const attr = nest.attributes || nest;
+                    const rels = nest.relationships || attr.relationships || {};
+                    const eggsRaw = rels.eggs?.data || attr.eggs || [];
+
+                    return {
+                        id: attr.id,
+                        name: attr.name,
+                        eggs: Array.isArray(eggsRaw) ? eggsRaw.map((egg: any) => ({
+                            id: egg.attributes?.id || egg.id,
+                            name: egg.attributes?.name || egg.name,
+                        })) : []
+                    };
+                });
 
                 console.log('Normalized Nests:', normalizedNests);
                 setNests(normalizedNests);
@@ -172,6 +179,7 @@ const CreateServerContainer = () => {
                 )}
 
                 <Formik
+                    enableReinitialize
                     initialValues={{
                         name: '',
                         nest_id: nests?.[0]?.id || 0,
