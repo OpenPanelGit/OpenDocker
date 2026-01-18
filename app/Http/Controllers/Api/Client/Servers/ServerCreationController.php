@@ -24,6 +24,9 @@ class ServerCreationController extends ClientApiController
     /**
      * Create a new server for the authenticated user using their bought resources.
      */
+    /**
+     * Create a new server for the authenticated user using their bought resources.
+     */
     public function store(Request $request): JsonResponse
     {
         $request->validate([
@@ -40,8 +43,14 @@ class ServerCreationController extends ClientApiController
         $user = $request->user();
         $settings = app(\Pterodactyl\Contracts\Repository\SettingsRepositoryInterface::class);
 
-        if ($user->bought_slots <= 0) {
-            return new JsonResponse(['error' => 'Vous n\'avez plus de slots de serveur disponibles.'], 400);
+        // Fix: Use slots as a Limit, not a consumable.
+        // If the user has more or equal servers than bought slots, valid deny.
+        // We use the same calculation as User::availableResources to be consistent.
+        $usedSlots = $user->servers()->count();
+        $totalSlots = $user->bought_slots ?? 0;
+        
+        if ($usedSlots >= $totalSlots) {
+             return new JsonResponse(['error' => "Vous avez atteint votre limite de serveurs (Slots: {$totalSlots})."], 400);
         }
 
         // 1. Check against User's available total resources
@@ -55,8 +64,11 @@ class ServerCreationController extends ClientApiController
         ];
 
         foreach ($requested as $key => $value) {
+            // Note: availableResources() calculation includes the current request's potential usage 
+            // only if we correctly subtract used. User::available logic already does (bought - allocated).
+            // So plain comparison is correct.
             if ($value > $available[$key]) {
-                return new JsonResponse(['error' => "Vous n'avez pas assez de ressources ({$key}) disponibles. Disponible: {$available[$key]}"], 400);
+                return new JsonResponse(['error' => "Vous n'avez pas assez de ressources ({$key}) disponibles. Demandé: {$value}, Disponible: {$available[$key]}"], 400);
             }
         }
 
@@ -78,13 +90,33 @@ class ServerCreationController extends ClientApiController
         // Find a suitable node automatically (simplified: just pick first active node)
         $node = Node::where('public', true)->first();
         if (!$node) {
-            return new JsonResponse(['error' => 'Aucun nœud disponible pour le déploiement.'], 400);
+            \Log::error("Store: Server creation failed. No public node found.");
+            return new JsonResponse(['error' => 'Aucun nœud public disponible pour le déploiement. Veuillez contacter l\'administrateur.'], 400);
         }
 
         // Find an available allocation on that node
         $allocation = Allocation::where('node_id', $node->id)->whereNull('server_id')->first();
         if (!$allocation) {
-            return new JsonResponse(['error' => 'Aucune allocation (IP/Port) disponible sur le nœud.'], 400);
+            \Log::error("Store: Server creation failed. No allocation found on Node ID {$node->id}.");
+            return new JsonResponse(['error' => 'Aucune allocation (IP/Port) disponible sur le nœud. Veuillez contacter l\'administrateur.'], 400);
+        }
+
+        // Fetch Egg to get startup details
+        $egg = \Pterodactyl\Models\Egg::find($request->input('egg_id'));
+        if (!$egg || $egg->nest_id != $request->input('nest_id')) {
+            return new JsonResponse(['error' => 'L\'Egg sélectionné est invalide ou n\'appartient pas à la catégorie choisie.'], 400);
+        }
+        
+        // Get the first docker image from the list or fallback
+        $dockerImage = 'ghcr.io/pterodactyl/yolks:debian';
+        if (!empty($egg->docker_images)) {
+             $dockerImage = array_values($egg->docker_images)[0];
+        }
+
+        // Prepare environment variables from Egg defaults
+        $environment = [];
+        foreach ($egg->variables as $variable) {
+            $environment[$variable->env_variable] = $variable->default_value;
         }
 
         try {
@@ -101,20 +133,21 @@ class ServerCreationController extends ClientApiController
                 'backup_limit' => $requested['backups'],
                 'swap' => 0,
                 'io' => 500,
-                'image' => 'ghcr.io/pterodactyl/yolks:debian', // Default image or from egg
-                'startup' => 'java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar {{SERVER_JARFILE}}', // Default startup
-                'environment' => [],
+                'image' => $dockerImage,
+                'startup' => $egg->startup,
+                'environment' => $environment,
                 'start_on_completion' => true,
             ]);
 
-            // Decrement slots
-            $user->decrement('bought_slots');
+            // We do NOT decrement bought_slots anymore, as it acts as a limit.
+            // $user->decrement('bought_slots'); 
 
             return new JsonResponse([
                 'success' => true,
                 'server' => $server,
             ]);
         } catch (\Exception $e) {
+            \Log::error($e);
             return new JsonResponse(['error' => 'Échec de la création du serveur: ' . $e->getMessage()], 500);
         }
     }
