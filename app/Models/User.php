@@ -296,7 +296,7 @@ class User extends Model implements
     public function accessibleServers(): Builder
     {
         return Server::query()
-            ->select('servers.id', 'servers.name', 'servers.owner_id')
+            ->select('servers.*')
             ->leftJoin('subusers', 'subusers.server_id', '=', 'servers.id')
             ->where(function (Builder $builder) {
                 $builder->where('servers.owner_id', $this->id)->orWhere('subusers.user_id', $this->id);
