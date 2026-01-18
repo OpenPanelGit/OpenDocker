@@ -180,7 +180,11 @@
                                     <small>{{ $server->uuidShort }}</small>
                                 </td>
                                 <td>
-                                    <a href="{{ route('admin.nodes.view', $server->node->id) }}">{{ $server->node->name }}</a>
+                                    @if($server->node)
+                                        <a href="{{ route('admin.nodes.view', $server->node->id) }}">{{ $server->node->name }}</a>
+                                    @else
+                                        <span class="text-muted">Unknown Node</span>
+                                    @endif
                                 </td>
                                 <td>
                                     @if($server->suspended)
@@ -311,7 +315,11 @@
                                     <a href="{{ route('admin.users.view', $server->owner_id) }}">{{ $server->user->username ?? 'Unknown' }}</a>
                                 </td>
                                 <td>
-                                    <a href="{{ route('admin.nodes.view', $server->node->id) }}">{{ $server->node->name }}</a>
+                                    @if($server->node)
+                                        <a href="{{ route('admin.nodes.view', $server->node->id) }}">{{ $server->node->name }}</a>
+                                    @else
+                                        Unknown
+                                    @endif
                                 </td>
                                 <td>
                                     <a href="{{ route('admin.servers.view', $server->id) }}" class="btn btn-sm btn-primary">Manage</a>

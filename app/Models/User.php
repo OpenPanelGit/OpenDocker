@@ -301,7 +301,7 @@ class User extends Model implements
             ->where(function (Builder $builder) {
                 $builder->where('servers.owner_id', $this->id)->orWhere('subusers.user_id', $this->id);
             })
-            ->groupBy('servers.id', 'servers.name', 'servers.owner_id');
+            ->distinct();
     }
     /**
      * Returns the total resources allocated to all servers owned by this user.
