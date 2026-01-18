@@ -56,7 +56,7 @@ const StoreContainer = () => {
     const onPurchase = (productId: number) => {
         http.post('/api/client/store/purchase', { product_id: productId })
             .then(({ data }) => {
-                addFlash({ type: 'success', message: data.message });
+                addFlash({ type: 'success', message: 'Achat effectué avec succès !' });
                 updateUserData({ coins: Number(data.balance) });
             })
             .catch((error) => {
