@@ -105,7 +105,7 @@ class StoreController extends ClientApiController
             \Illuminate\Support\Facades\DB::table('users')
                 ->where('id', $user->id)
                 ->update([
-                    'coins' => \Illuminate\Support\Facades\DB::raw('coins + ' . (float) $gain),
+                    'coins' => \Illuminate\Support\Facades\DB::raw('COALESCE(coins, 0) + ' . (float) $gain),
                     'last_afk_gain' => $now,
                 ]);
             

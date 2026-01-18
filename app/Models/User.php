@@ -210,6 +210,7 @@ class User extends Model implements
     {
         $settings = app(\Pterodactyl\Contracts\Repository\SettingsRepositoryInterface::class);
         $data = Collection::make($this->toArray())->except(['id', 'external_id'])->toArray();
+        $data['coins'] = (float) ($this->coins ?? 0);
         $data['rate'] = (float) ($settings->get('store:afk_rate') ?? 0.1);
 
         return $data;
