@@ -23,6 +23,12 @@ class StoreController extends ClientApiController
             'products' => StoreProduct::where('enabled', true)->get(),
             'balance' => (float) $request->user()->coins,
             'rate' => (float) ($settings->get('store:afk_rate') ?? 0.1),
+            'limit_cpu' => (int) ($settings->get('store:limit_cpu') ?? 100),
+            'limit_memory' => (int) ($settings->get('store:limit_memory') ?? 4096),
+            'limit_disk' => (int) ($settings->get('store:limit_disk') ?? 10240),
+            'limit_databases' => (int) ($settings->get('store:limit_databases') ?? 5),
+            'limit_backups' => (int) ($settings->get('store:limit_backups') ?? 5),
+            'available' => $request->user()->availableResources(),
         ];
     }
 

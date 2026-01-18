@@ -19,6 +19,11 @@ class StoreController extends Controller
             return view('admin.store.index', [
                 'products' => StoreProduct::all(),
                 'afk_rate' => $settings->get('store:afk_rate', 0.1),
+                'limit_cpu' => $settings->get('store:limit_cpu', 100),
+                'limit_memory' => $settings->get('store:limit_memory', 4096),
+                'limit_disk' => $settings->get('store:limit_disk', 10240),
+                'limit_databases' => $settings->get('store:limit_databases', 5),
+                'limit_backups' => $settings->get('store:limit_backups', 5),
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -33,7 +38,13 @@ class StoreController extends Controller
      */
     public function updateSettings(Request $request)
     {
-        app(SettingsRepositoryInterface::class)->set('store:afk_rate', $request->input('afk_rate'));
+        $settings = app(SettingsRepositoryInterface::class);
+        $settings->set('store:afk_rate', $request->input('afk_rate'));
+        $settings->set('store:limit_cpu', $request->input('limit_cpu'));
+        $settings->set('store:limit_memory', $request->input('limit_memory'));
+        $settings->set('store:limit_disk', $request->input('limit_disk'));
+        $settings->set('store:limit_databases', $request->input('limit_databases'));
+        $settings->set('store:limit_backups', $request->input('limit_backups'));
 
         return redirect()->route('admin.store.index')->with('success', 'Paramètres mis à jour avec succès.');
     }

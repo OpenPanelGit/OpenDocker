@@ -27,6 +27,31 @@
                         <input type="number" step="0.0001" name="afk_rate" class="form-control" value="{{ $afk_rate }}" />
                         <p class="text-muted small">Nombre de coins gagnés par l'utilisateur pour chaque minute passée sur le panel.</p>
                     </div>
+
+                    <hr>
+                    <h4>Limites de Ressources par Serveur</h4>
+                    <p class="text-muted small">Définit le maximum de ressources qu'un utilisateur peut allouer à un <strong>seul</strong> serveur.</p>
+
+                    <div class="form-group">
+                        <label for="limit_cpu">Limite CPU Max (%)</label>
+                        <input type="number" name="limit_cpu" class="form-control" value="{{ $limit_cpu }}" />
+                    </div>
+                    <div class="form-group">
+                        <label for="limit_memory">Limite Mémoire Max (MB)</label>
+                        <input type="number" name="limit_memory" class="form-control" value="{{ $limit_memory }}" />
+                    </div>
+                    <div class="form-group">
+                        <label for="limit_disk">Limite Disque Max (MB)</label>
+                        <input type="number" name="limit_disk" class="form-control" value="{{ $limit_disk }}" />
+                    </div>
+                    <div class="form-group">
+                        <label for="limit_databases">Limite Bases de données Max</label>
+                        <input type="number" name="limit_databases" class="form-control" value="{{ $limit_databases }}" />
+                    </div>
+                    <div class="form-group">
+                        <label for="limit_backups">Limite Backups Max</label>
+                        <input type="number" name="limit_backups" class="form-control" value="{{ $limit_backups }}" />
+                    </div>
                 </div>
                 <div class="box-footer">
                     <button type="submit" class="btn btn-primary pull-right">Mettre à jour</button>

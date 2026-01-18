@@ -294,4 +294,36 @@ class User extends Model implements
             })
             ->groupBy('servers.id', 'servers.name', 'servers.owner_id');
     }
+    /**
+     * Returns the total resources allocated to all servers owned by this user.
+     */
+    public function allocatedResources(): array
+    {
+        $stats = $this->servers()->selectRaw('SUM(memory) as memory, SUM(cpu) as cpu, SUM(disk) as disk, SUM(database_limit) as databases, SUM(backup_limit) as backups')->first();
+
+        return [
+            'memory' => (int) ($stats->memory ?? 0),
+            'cpu' => (int) ($stats->cpu ?? 0),
+            'disk' => (int) ($stats->disk ?? 0),
+            'databases' => (int) ($stats->databases ?? 0),
+            'backups' => (int) ($stats->backups ?? 0),
+        ];
+    }
+
+    /**
+     * Returns the remaining resources available for this user to allocate.
+     */
+    public function availableResources(): array
+    {
+        $allocated = $this->allocatedResources();
+
+        return [
+            'memory' => max(0, $this->bought_memory - $allocated['memory']),
+            'cpu' => max(0, $this->bought_cpu - $allocated['cpu']),
+            'disk' => max(0, $this->bought_disk - $allocated['disk']),
+            'databases' => max(0, $this->bought_databases - $allocated['databases']),
+            'backups' => max(0, $this->bought_backups - $allocated['backups']),
+            'slots' => (int) $this->bought_slots,
+        ];
+    }
 }

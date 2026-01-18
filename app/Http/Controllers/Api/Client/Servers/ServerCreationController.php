@@ -30,11 +30,49 @@ class ServerCreationController extends ClientApiController
             'name' => 'required|string|min:3',
             'nest_id' => 'required|integer|exists:nests,id',
             'egg_id' => 'required|integer|exists:eggs,id',
+            'memory' => 'required|integer|min:128',
+            'cpu' => 'required|integer|min:10',
+            'disk' => 'required|integer|min:128',
+            'databases' => 'required|integer|min:0',
+            'backups' => 'required|integer|min:0',
         ]);
+
         $user = $request->user();
+        $settings = app(\Pterodactyl\Contracts\Repository\SettingsRepositoryInterface::class);
 
         if ($user->bought_slots <= 0) {
             return new JsonResponse(['error' => 'Vous n\'avez plus de slots de serveur disponibles.'], 400);
+        }
+
+        // 1. Check against User's available total resources
+        $available = $user->availableResources();
+        $requested = [
+            'memory' => (int) $request->input('memory'),
+            'cpu' => (int) $request->input('cpu'),
+            'disk' => (int) $request->input('disk'),
+            'databases' => (int) $request->input('databases'),
+            'backups' => (int) $request->input('backups'),
+        ];
+
+        foreach ($requested as $key => $value) {
+            if ($value > $available[$key]) {
+                return new JsonResponse(['error' => "Vous n'avez pas assez de ressources ({$key}) disponibles. Disponible: {$available[$key]}"], 400);
+            }
+        }
+
+        // 2. Check against Admin's global server limits
+        $limits = [
+            'memory' => (int) $settings->get('store:limit_memory', 4096),
+            'cpu' => (int) $settings->get('store:limit_cpu', 100),
+            'disk' => (int) $settings->get('store:limit_disk', 10240),
+            'databases' => (int) $settings->get('store:limit_databases', 5),
+            'backups' => (int) $settings->get('store:limit_backups', 5),
+        ];
+
+        foreach ($requested as $key => $value) {
+            if ($value > $limits[$key]) {
+                return new JsonResponse(['error' => "Cette configuration dépasse la limite autorisée par l'administration pour un serveur ({$key}: {$limits[$key]})"], 400);
+            }
         }
 
         // Find a suitable node automatically (simplified: just pick first active node)
@@ -56,11 +94,11 @@ class ServerCreationController extends ClientApiController
                 'egg_id' => $request->input('egg_id'),
                 'nest_id' => $request->input('nest_id'),
                 'allocation_id' => $allocation->id,
-                'memory' => $user->bought_memory,
-                'cpu' => $user->bought_cpu,
-                'disk' => $user->bought_disk,
-                'databases' => $user->bought_databases,
-                'backups' => $user->bought_backups,
+                'memory' => $requested['memory'],
+                'cpu' => $requested['cpu'],
+                'disk' => $requested['disk'],
+                'database_limit' => $requested['databases'],
+                'backup_limit' => $requested['backups'],
                 'swap' => 0,
                 'io' => 500,
                 'image' => 'ghcr.io/pterodactyl/yolks:debian', // Default image or from egg
