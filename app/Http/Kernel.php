@@ -63,7 +63,6 @@ class Kernel extends HttpKernel
             VerifyCsrfToken::class,
             SubstituteBindings::class,
             LanguageMiddleware::class,
-            \App\Http\Middleware\CheckSuspended::class,
         ],
         'api' => [
             EncryptCookies::class,
