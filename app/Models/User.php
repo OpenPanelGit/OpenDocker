@@ -136,6 +136,7 @@ class User extends Model implements
         'bought_slots',
         'bought_databases',
         'bought_backups',
+        'suspended',
     ];
 
     /**

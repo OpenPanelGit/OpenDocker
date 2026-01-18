@@ -9,6 +9,10 @@ Route::get('/account', [Base\IndexController::class, 'index'])
   ->withoutMiddleware(RequireTwoFactorAuthentication::class)
   ->name('account');
 
+Route::get('/account/suspended', function () {
+    return view('errors.suspended');
+})->name('account.suspended')->middleware(['auth']);
+
 Route::get('/locales/locale.json', Base\LocaleController::class)
   ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
   ->where('namespace', '.*');
