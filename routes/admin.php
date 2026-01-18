@@ -124,6 +124,7 @@ Route::group(['prefix' => 'users'], function () {
     Route::post('/new', [Admin\UserController::class, 'store']);
 
     Route::patch('/view/{user:id}', [Admin\UserController::class, 'update']);
+    Route::post('/view/{user:id}/suspend', [Admin\UserController::class, 'suspend'])->name('admin.users.suspend');
     Route::delete('/view/{user:id}', [Admin\UserController::class, 'delete']);
 });
 

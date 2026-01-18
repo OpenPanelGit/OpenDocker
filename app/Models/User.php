@@ -154,6 +154,7 @@ class User extends Model implements
         'bought_slots' => 'integer',
         'bought_databases' => 'integer',
         'bought_backups' => 'integer',
+        'suspended' => 'boolean',
     ];
 
     /**

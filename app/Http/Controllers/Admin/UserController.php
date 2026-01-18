@@ -162,4 +162,18 @@ public function index(Request $request): View
             return $item;
         });
     }
+    /**
+     * Suspend or unsuspend a user.
+     */
+    public function suspend(Request $request, User $user): RedirectResponse
+    {
+        $user->update([
+            'suspended' => !$user->suspended
+        ]);
+
+        $action = $user->suspended ? 'suspended' : 'unsuspended';
+        $this->alert->success("User has been $action.")->flash();
+
+        return redirect()->route('admin.users.view', $user->id);
+    }
 }
