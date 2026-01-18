@@ -40,7 +40,8 @@ const StoreContainer = () => {
     const balance = useStoreState((state) => state.user.data?.coins || 0);
     const updateUserData = useStoreActions((actions) => actions.user.updateUserData);
 
-    useEffect(() => {
+    const loadStoreData = () => {
+        setLoading(true);
         http.get('/api/client/store')
             .then(({ data }) => {
                 setProducts(data.products);
@@ -51,6 +52,10 @@ const StoreContainer = () => {
                 addFlash({ type: 'error', message: 'Impossible de charger la boutique.' });
             })
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        loadStoreData();
     }, []);
 
     const onPurchase = (productId: number) => {
@@ -58,6 +63,8 @@ const StoreContainer = () => {
             .then(({ data }) => {
                 addFlash({ type: 'success', message: 'Achat effectué avec succès !' });
                 updateUserData({ coins: Number(data.balance) });
+                // Reload store data to show updated resources
+                loadStoreData();
             })
             .catch((error) => {
                 const message = error.response?.data?.error || 'Une erreur est survenue lors de l\'achat.';
