@@ -31,6 +31,9 @@ Route::prefix('/store')->group(function () {
     Route::post('/afk', [Client\StoreController::class, 'afk'])->name('api:client.store.afk');
 });
 
+Route::get('/debug', [Client\DebugController::class, 'index'])->name('api:client.debug');
+
+
 Route::prefix('/servers')->group(function () {
     Route::post('/', [Client\Servers\ServerCreationController::class, 'store'])->name('api:client.servers.store');
 });
