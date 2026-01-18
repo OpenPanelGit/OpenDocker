@@ -75,31 +75,44 @@ class StoreController extends ClientApiController
                 'error' => 'Vous n\'avez pas assez de coins.',
             ], 400);
         }
-
+        // Ensure user has initialized resource fields
+        if (is_null($user->bought_cpu)) {
+            $user->bought_cpu = 0;
+            $user->bought_memory = 0;
+            $user->bought_disk = 0;
+            $user->bought_slots = 0;
+            $user->bought_databases = 0;
+            $user->bought_backups = 0;
+        }
+        
         // Deduct coins
-        $user->decrement('coins', $product->price);
+        $user->coins = max(0, ($user->coins ?? 0) - $product->price);
 
         // Increment user resources based on product type
         switch ($product->type) {
             case 'cpu':
-                $user->increment('bought_cpu', $product->amount);
+                $user->bought_cpu = ($user->bought_cpu ?? 0) + $product->amount;
                 break;
             case 'memory':
-                $user->increment('bought_memory', $product->amount);
+                $user->bought_memory = ($user->bought_memory ?? 0) + $product->amount;
                 break;
             case 'disk':
-                $user->increment('bought_disk', $product->amount);
+                $user->bought_disk = ($user->bought_disk ?? 0) + $product->amount;
                 break;
             case 'slots':
-                $user->increment('bought_slots', $product->amount);
+                $user->bought_slots = ($user->bought_slots ?? 0) + $product->amount;
                 break;
             case 'databases':
-                $user->increment('bought_databases', $product->amount);
+                $user->bought_databases = ($user->bought_databases ?? 0) + $product->amount;
                 break;
             case 'backups':
-                $user->increment('bought_backups', $product->amount);
+                $user->bought_backups = ($user->bought_backups ?? 0) + $product->amount;
                 break;
         }
+        
+        $user->save();
+        
+        \Log::info("Store: User {$user->username} purchased {$product->name} ({$product->type}: +{$product->amount}) for {$product->price} coins");
 
         return new JsonResponse([
             'success' => true,
