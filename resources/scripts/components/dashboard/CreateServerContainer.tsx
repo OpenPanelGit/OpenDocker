@@ -104,7 +104,22 @@ const CreateServerContainer = () => {
 
     useEffect(() => {
         http.get('/api/client/nests')
-            .then(({ data }) => setNests(data))
+            .then(({ data }) => {
+                // Handle Pterodactyl API response structure (data.data is the array)
+                const rawNests = Array.isArray(data) ? data : (data.data || []);
+
+                // Normalize nests to ensure eggs is always an array
+                const normalizedNests = rawNests.map((nest: any) => ({
+                    ...nest,
+                    attributes: nest.attributes || nest, // Fallback if flattened or not
+                    eggs: Array.isArray(nest.eggs)
+                        ? nest.eggs
+                        : (nest.eggs?.data || []) // Handle nested 'data' key for relationships
+                }));
+
+                console.log('Normalized Nests:', normalizedNests);
+                setNests(normalizedNests);
+            })
             .catch(console.error)
             .finally(() => setLoading(false));
     }, []);
@@ -160,7 +175,7 @@ const CreateServerContainer = () => {
                     initialValues={{
                         name: '',
                         nest_id: nests?.[0]?.id || 0,
-                        egg_id: nests?.[0]?.eggs?.[0]?.id || 0,
+                        egg_id: (nests?.[0]?.eggs && nests[0].eggs[0]?.id) || 0,
                         memory: user?.boughtMemory ?? 0,
                         cpu: user?.boughtCpu ?? 0,
                         disk: user?.boughtDisk ?? 0,
@@ -196,7 +211,7 @@ const CreateServerContainer = () => {
                                                 }
                                             }}
                                         >
-                                            {nests.map(nest => (
+                                            {Array.isArray(nests) && nests.map(nest => (
                                                 <option key={nest.id} value={nest.id}>{nest.name}</option>
                                             ))}
                                         </Select>

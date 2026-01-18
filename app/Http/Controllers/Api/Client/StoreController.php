@@ -95,16 +95,24 @@ class StoreController extends ClientApiController
         $diffInSeconds = $now->diffInSeconds($user->last_afk_gain);
         
         // Award coins for any amount of time passed (per second precision)
+        // Award coins for any amount of time passed (per second precision)
         if ($diffInSeconds >= 1) {
             $gain = ($diffInSeconds / 60) * $earningRate;
-            $user->coins += $gain;
-            $user->last_afk_gain = $now;
-            $user->save();
+            
+            // Log for debugging
+            \Illuminate\Support\Facades\Log::info("AFK Sync: User {$user->id} gained {$gain} coins. Rate: {$earningRate}. Seconds: {$diffInSeconds}");
+
+            // Use direct SQL update to ensure atomic increment and avoid model casting issues
+            $user->increment('coins', $gain);
+            $user->update(['last_afk_gain' => $now]);
+            
+            // Refresh model to get the exact new DB value
+            $freshUser = $user->fresh();
             
             return new JsonResponse([
                 'success' => true,
                 'gain' => (float) $gain,
-                'balance' => (float) $user->coins,
+                'balance' => (float) $freshUser->coins,
                 'rate' => $earningRate,
             ]);
         }
