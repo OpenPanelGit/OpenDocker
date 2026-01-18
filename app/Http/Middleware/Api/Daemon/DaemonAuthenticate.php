@@ -17,6 +17,7 @@ class DaemonAuthenticate
      */
     protected array $except = [
         'daemon.configuration',
+        'daemon.install',
     ];
 
     /**

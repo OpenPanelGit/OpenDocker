@@ -21,8 +21,15 @@ class NodeInstallScriptController extends Controller
     /**
      * Returns a bash script to install and configure Wings for the given node.
      */
-    public function __invoke(Request $request, Node $node)
+    public function __invoke(Request $request, string $uuid)
     {
+        \Illuminate\Support\Facades\Log::info("NodeInstallScript: Request for UUID {$uuid}");
+        $node = Node::where('uuid', $uuid)->first();
+        if (!$node) {
+            return response('Erreur : Node introuvable avec l\'UUID ' . $uuid, 404)
+                ->header('Content-Type', 'text/plain');
+        }
+
         $token = $request->query('token');
         $user = $request->user();
 

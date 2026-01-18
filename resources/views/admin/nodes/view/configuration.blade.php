@@ -74,7 +74,7 @@
             var commandTemplate = "{!! addslashes($node->getAutoDeploy("PLACEHOLDER_TOKEN")) !!}";
             var command = commandTemplate.replace('PLACEHOLDER_TOKEN', data.token);
 
-            var installUrl = "{{ config('app.url') }}/api/remote/install/{{ $node->uuid }}?token=" + data.token;
+            var installUrl = window.location.origin + "/api/remote/install/{{ $node->uuid }}?token=" + data.token;
             var installCommand = "curl -sSL " + installUrl + " | sudo bash";
 
             swal({

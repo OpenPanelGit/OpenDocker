@@ -46,4 +46,4 @@ Route::group(['prefix' => '/elytra-jobs'], function () {
     Route::put('/{jobId}', [ElytraJobCompletionController::class, 'update']);
 });
 
-Route::get('/install/{node:uuid}', NodeInstallScriptController::class);
+Route::get('/install/{uuid}', NodeInstallScriptController::class)->name('daemon.install');
