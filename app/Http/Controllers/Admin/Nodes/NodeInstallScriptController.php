@@ -70,7 +70,7 @@ class NodeInstallScriptController extends Controller
         }
 
         $token = $key->identifier . $this->encrypter->decrypt($key->token);
-        $appUrl = config('app.url');
+        $appUrl = $request->getSchemeAndHttpHost();
         
         // Ensure appUrl doesn't have a trailing slash
         $appUrl = rtrim($appUrl, '/');
