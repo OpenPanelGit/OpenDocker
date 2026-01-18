@@ -3,6 +3,9 @@
 # OpenPanel Installation Script
 set -e
 
+mkdir /var/www/pelican
+cd /var/www/pelican
+
 # ANSI Color Codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
