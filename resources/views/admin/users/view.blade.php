@@ -116,10 +116,10 @@
                     {!! method_field('DELETE') !!}
                     <input id="delete" type="submit" class="btn btn-sm btn-danger pull-right" {{ $user->servers->count() < 1 ?: 'disabled' }} value="Delete User" />
                 </form>
-                {{-- <form action="{{ route('admin.users.suspend', $user->id) }}" method="POST">
+                <form action="{{ route('admin.users.suspend', $user->id) }}" method="POST">
                      {!! csrf_field() !!}
                      <input type="submit" class="btn btn-sm btn-warning pull-left" value="{{ $user->suspended ? 'Unsuspend' : 'Suspend' }} User" />
-                </form> --}}
+                </form>
             </div>
         </div>
     </div>
