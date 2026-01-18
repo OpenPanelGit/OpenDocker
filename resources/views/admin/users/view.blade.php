@@ -101,7 +101,267 @@
                 </div>
             </div>
         </div>
+        <div class="col-md-6">
+             <div class="box box-info">
+                 <div class="box-header with-border">
+                     <h3 class="box-title">Store Resources</h3>
+                 </div>
+                 <div class="box-body">
+                     <div class="row">
+                        <div class="col-xs-12">
+                             <div class="form-group">
+                                 <label for="coins" class="control-label">Coins (Credits)</label>
+                                 <input type="number" name="coins" value="{{ $user->coins }}" class="form-control" step="0.01">
+                             </div>
+                        </div>
+                        <div class="col-xs-6">
+                             <div class="form-group">
+                                 <label for="bought_cpu" class="control-label">CPU Limit (%)</label>
+                                 <input type="number" name="bought_cpu" value="{{ $user->bought_cpu }}" class="form-control">
+                             </div>
+                        </div>
+                        <div class="col-xs-6">
+                             <div class="form-group">
+                                 <label for="bought_memory" class="control-label">Memory Limit (MB)</label>
+                                 <input type="number" name="bought_memory" value="{{ $user->bought_memory }}" class="form-control">
+                             </div>
+                        </div>
+                        <div class="col-xs-6">
+                             <div class="form-group">
+                                 <label for="bought_disk" class="control-label">Disk Limit (MB)</label>
+                                 <input type="number" name="bought_disk" value="{{ $user->bought_disk }}" class="form-control">
+                             </div>
+                        </div>
+                        <div class="col-xs-6">
+                             <div class="form-group">
+                                 <label for="bought_slots" class="control-label">Server Slots</label>
+                                 <input type="number" name="bought_slots" value="{{ $user->bought_slots }}" class="form-control">
+                             </div>
+                        </div>
+                        <div class="col-xs-6">
+                             <div class="form-group">
+                                 <label for="bought_databases" class="control-label">Database Limit</label>
+                                 <input type="number" name="bought_databases" value="{{ $user->bought_databases }}" class="form-control">
+                             </div>
+                        </div>
+                        <div class="col-xs-6">
+                             <div class="form-group">
+                                 <label for="bought_backups" class="control-label">Backup Limit</label>
+                                 <input type="number" name="bought_backups" value="{{ $user->bought_backups }}" class="form-control">
+                             </div>
+                        </div>
+                     </div>
+                 </div>
+             </div>
+        </div>
     </form>
+    <div class="col-xs-12">
+        <div class="box box-primary">
+            <div class="box-header with-border">
+                <h3 class="box-title">Associated Servers</h3>
+            </div>
+            <div class="box-body table-responsive no-padding">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Server Name</th>
+                            <th>Node</th>
+                            <th>Status</th>
+                            <th>Resources (CPU / RAM / Disk)</th>
+                            <th class="text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($user->servers as $server)
+                            <tr>
+                                <td>
+                                    <a href="{{ route('admin.servers.view', $server->id) }}">{{ $server->name }}</a>
+                                    <br>
+                                    <small>{{ $server->uuidShort }}</small>
+                                </td>
+                                <td>
+                                    <a href="{{ route('admin.nodes.view', $server->node->id) }}">{{ $server->node->name }}</a>
+                                </td>
+                                <td>
+                                    @if($server->suspended)
+                                        <span class="label label-warning">Suspended</span>
+                                    @elseif(!$server->installed_at)
+                                        <span class="label label-info">Installing</span>
+                                    @else
+                                        <span class="label label-success">Active</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    {{ $server->cpu }}% / {{ $server->memory }}MB / {{ $server->disk }}MB
+                                </td>
+                                <td class="text-right">
+                                    <a href="{{ route('admin.servers.view', $server->id) }}" class="btn btn-sm btn-primary">Manage</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                        @if($user->servers->isEmpty())
+                            <tr>
+                                <td colspan="5" class="text-center">No servers associated with this user.</td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xs-12">
+        <div class="box box-info">
+            <div class="box-header with-border">
+                <h3 class="box-title">Activity Logs (Last 10 Events)</h3>
+            </div>
+            <div class="box-body table-responsive no-padding">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Action</th>
+                            <th>Description</th>
+                            <th>IP Address</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($user->activity->sortByDesc('created_at')->take(10) as $activity)
+                            <tr>
+                                <td>{{ $activity->event }}</td>
+                                <td>{{ $activity->description }}</td>
+                                <td>{{ $activity->ip }}</td>
+                                <td>{{ $activity->created_at->diffForHumans() }}</td>
+                            </tr>
+                        @endforeach
+                        @if($user->activity->isEmpty())
+                            <tr>
+                                <td colspan="4" class="text-center">No activity recorded.</td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xs-12">
+        <div class="box box-danger">
+            <div class="box-header with-border">
+                <h3 class="box-title">Delete User</h3>
+            </div>
+            <div class="box-body">
+                <p class="no-margin">There must be no servers associated with this account in order for it to be deleted.</p>
+            </div>
+    <div class="col-xs-12">
+        <div class="box box-primary">
+            <div class="box-header with-border">
+                <h3 class="box-title">SSH Keys</h3>
+            </div>
+            <div class="box-body table-responsive no-padding">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Fingerprint</th>
+                            <th>Name</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($user->sshKeys as $key)
+                            <tr>
+                                <td><code>{{ $key->fingerprint }}</code></td>
+                                <td>{{ $key->name }}</td>
+                                <td>{{ $key->created_at->diffForHumans() }}</td>
+                            </tr>
+                        @endforeach
+                        @if($user->sshKeys->isEmpty())
+                            <tr>
+                                <td colspan="3" class="text-center">No SSH keys found.</td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xs-12">
+        <div class="box box-primary">
+            <div class="box-header with-border">
+                <h3 class="box-title">Servers (Subuser Access)</h3>
+            </div>
+            <div class="box-body table-responsive no-padding">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Server Name</th>
+                            <th>Owner</th>
+                            <th>Node</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($user->accessibleServers()->where('owner_id', '!=', $user->id)->get() as $server)
+                            <tr>
+                                <td>
+                                    <a href="{{ route('admin.servers.view', $server->id) }}">{{ $server->name }}</a>
+                                    <br>
+                                    <small>{{ $server->uuidShort }}</small>
+                                </td>
+                                <td>
+                                    <a href="{{ route('admin.users.view', $server->owner_id) }}">{{ $server->user->username ?? 'Unknown' }}</a>
+                                </td>
+                                <td>
+                                    <a href="{{ route('admin.nodes.view', $server->node->id) }}">{{ $server->node->name }}</a>
+                                </td>
+                                <td>
+                                    <a href="{{ route('admin.servers.view', $server->id) }}" class="btn btn-sm btn-primary">Manage</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                        @if($user->accessibleServers()->where('owner_id', '!=', $user->id)->count() === 0)
+                            <tr>
+                                <td colspan="4" class="text-center">No external server access.</td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xs-12">
+        <div class="box box-warning">
+            <div class="box-header with-border">
+                <h3 class="box-title">API Keys</h3>
+            </div>
+            <div class="box-body table-responsive no-padding">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th>Identifier</th>
+                            <th>Last Used</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($user->apiKeys as $key)
+                            <tr>
+                                <td>{{ $key->memo }}</td>
+                                <td><code>{{ $key->identifier }}</code></td>
+                                <td>{{ $key->last_used_at ? $key->last_used_at->diffForHumans() : 'Never' }}</td>
+                                <td>{{ $key->created_at->diffForHumans() }}</td>
+                            </tr>
+                        @endforeach
+                        @if($user->apiKeys->isEmpty())
+                            <tr>
+                                <td colspan="4" class="text-center">No API keys active.</td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
     <div class="col-xs-12">
         <div class="box box-danger">
             <div class="box-header with-border">
@@ -118,8 +378,18 @@
                 </form>
                 <form action="{{ route('admin.users.suspend', $user->id) }}" method="POST">
                      {!! csrf_field() !!}
-                     <input type="submit" class="btn btn-sm btn-warning pull-left" value="{{ $user->suspended ? 'Unsuspend' : 'Suspend' }} User" />
+                     <input type="submit" class="btn btn-sm btn-warning pull-left" style="margin-right: 10px;" value="{{ $user->suspended ? 'Unsuspend' : 'Suspend' }} User" />
                 </form>
+                <form action="{{ route('admin.users.login', $user->id) }}" method="POST">
+                     {!! csrf_field() !!}
+                     <input type="submit" class="btn btn-sm btn-success pull-left" style="margin-right: 10px;" value="Login As User" />
+                </form>
+                @if($user->use_totp)
+                <form action="{{ route('admin.users.2fa', $user->id) }}" method="POST">
+                     {!! csrf_field() !!}
+                     <input type="submit" class="btn btn-sm btn-danger pull-left" value="Disable 2FA" />
+                </form>
+                @endif
             </div>
         </div>
     </div>

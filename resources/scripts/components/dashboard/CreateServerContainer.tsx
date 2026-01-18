@@ -181,24 +181,48 @@ const CreateServerContainer = () => {
 
                 <div className='grid grid-cols-2 md:grid-cols-4 gap-4 mb-8'>
                     <ResourceBox>
-                        <Server width={20} height={20} className='text-brand' />
-                        <p className='text-xs text-white/40 uppercase font-bold'>Slots Restants</p>
-                        <p className='text-xl font-bold'>{available.slots || 0}</p>
+                        <div className='flex items-center gap-x-3'>
+                            <div className='p-2 rounded-full bg-brand/10'>
+                                <Server width={20} height={20} className='text-brand' />
+                            </div>
+                            <div className='text-left'>
+                                <p className='text-xs text-white/40 uppercase font-bold tracking-wider'>Slots</p>
+                                <p className='text-xl font-bold leading-none'>{available.slots || 0}</p>
+                            </div>
+                        </div>
                     </ResourceBox>
                     <ResourceBox>
-                        <Plus width={20} height={20} className='text-brand' />
-                        <p className='text-xs text-white/40 uppercase font-bold'>CPU Dispo.</p>
-                        <p className='text-xl font-bold'>{available.cpu || 0}%</p>
+                        <div className='flex items-center gap-x-3'>
+                            <div className='p-2 rounded-full bg-brand/10'>
+                                <Plus width={20} height={20} className='text-brand' />
+                            </div>
+                            <div className='text-left'>
+                                <p className='text-xs text-white/40 uppercase font-bold tracking-wider'>CPU</p>
+                                <p className='text-xl font-bold leading-none'>{available.cpu || 0}%</p>
+                            </div>
+                        </div>
                     </ResourceBox>
                     <ResourceBox>
-                        <Plus width={20} height={20} className='text-brand' />
-                        <p className='text-xs text-white/40 uppercase font-bold'>RAM Dispo.</p>
-                        <p className='text-xl font-bold'>{available.memory || 0} MB</p>
+                        <div className='flex items-center gap-x-3'>
+                            <div className='p-2 rounded-full bg-brand/10'>
+                                <Plus width={20} height={20} className='text-brand' />
+                            </div>
+                            <div className='text-left'>
+                                <p className='text-xs text-white/40 uppercase font-bold tracking-wider'>RAM</p>
+                                <p className='text-xl font-bold leading-none'>{available.memory || 0} MB</p>
+                            </div>
+                        </div>
                     </ResourceBox>
                     <ResourceBox>
-                        <Folder width={20} height={20} className='text-brand' />
-                        <p className='text-xs text-white/40 uppercase font-bold'>Disk Dispo.</p>
-                        <p className='text-xl font-bold'>{available.disk || 0} MB</p>
+                        <div className='flex items-center gap-x-3'>
+                            <div className='p-2 rounded-full bg-brand/10'>
+                                <Folder width={20} height={20} className='text-brand' />
+                            </div>
+                            <div className='text-left'>
+                                <p className='text-xs text-white/40 uppercase font-bold tracking-wider'>Disk</p>
+                                <p className='text-xl font-bold leading-none'>{available.disk || 0} MB</p>
+                            </div>
+                        </div>
                     </ResourceBox>
                 </div>
 

@@ -189,6 +189,13 @@ class User extends Model implements
         'language' => 'string',
         'use_totp' => 'boolean',
         'totp_secret' => 'nullable|string',
+        'coins' => 'sometimes|numeric|min:0',
+        'bought_cpu' => 'sometimes|integer|min:0',
+        'bought_memory' => 'sometimes|integer|min:0',
+        'bought_disk' => 'sometimes|integer|min:0',
+        'bought_slots' => 'sometimes|integer|min:0',
+        'bought_databases' => 'sometimes|integer|min:0',
+        'bought_backups' => 'sometimes|integer|min:0',
     ];
 
     /**

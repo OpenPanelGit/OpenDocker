@@ -33,20 +33,6 @@ class StoreController extends ClientApiController
         
         try {
             $available = $user->availableResources();
-            $allocated = $user->allocatedResources();
-            
-            \Log::info("Store Debug for User {$user->id}:", [
-                'bought' => [
-                    'memory' => $user->bought_memory,
-                    'cpu' => $user->bought_cpu,
-                    'disk' => $user->bought_disk,
-                    'slots' => $user->bought_slots,
-                ],
-                'allocated' => $allocated,
-                'available' => $available,
-                'server_count' => $user->servers()->count(),
-            ]);
-            
         } catch (\Exception $e) {
             \Log::error('Error getting available resources: ' . $e->getMessage());
             $available = [

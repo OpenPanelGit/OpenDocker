@@ -20,6 +20,8 @@ use Pterodactyl\Services\Users\UserCreationService;
 use Pterodactyl\Services\Users\UserDeletionService;
 use Pterodactyl\Http\Requests\Admin\UserFormRequest;
 use Pterodactyl\Http\Requests\Admin\NewUserFormRequest;
+use Illuminate\Support\Facades\Auth;
+use Pterodactyl\Facades\Activity;
 use Pterodactyl\Contracts\Repository\UserRepositoryInterface;
 
 class UserController extends Controller
@@ -175,5 +177,30 @@ public function index(Request $request): View
         $this->alert->success("User has been $action.")->flash();
 
         return redirect()->route('admin.users.view', $user->id);
+    }
+
+    /**
+     * Disable 2FA for a user.
+     */
+    public function disableTwoFactor(Request $request, User $user): RedirectResponse
+    {
+        $user->update([
+            'use_totp' => false,
+            'totp_secret' => null,
+        ]);
+
+        $this->alert->success('Two-factor authentication has been disabled for this account.')->flash();
+
+        return redirect()->route('admin.users.view', $user->id);
+    }
+
+    /**
+     * Log in as the user.
+     */
+    public function loginAs(Request $request, User $user): RedirectResponse
+    {
+        Auth::login($user);
+
+        return redirect()->route('index');
     }
 }

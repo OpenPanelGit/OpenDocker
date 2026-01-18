@@ -70,6 +70,10 @@ class ServerCreationController extends ClientApiController
             if ($value > $available[$key]) {
                 return new JsonResponse(['error' => "Vous n'avez pas assez de ressources ({$key}) disponibles. Demandé: {$value}, Disponible: {$available[$key]}"], 400);
             }
+            // Enforce that store servers cannot have "Unlimited" (0) resources, as this breaks the quota system.
+            if (($key === 'memory' || $key === 'disk' || $key === 'cpu') && $value <= 0) {
+                 return new JsonResponse(['error' => "Les ressources 'illimitées' ne sont pas autorisées avec le système de boutique. Veuillez spécifier une valeur."], 400);
+            }
         }
 
         // 2. Check against Admin's global server limits

@@ -125,6 +125,8 @@ Route::group(['prefix' => 'users'], function () {
 
     Route::patch('/view/{user:id}', [Admin\UserController::class, 'update']);
     Route::post('/view/{user:id}/suspend', [Admin\UserController::class, 'suspend'])->name('admin.users.suspend');
+    Route::post('/view/{user:id}/login', [Admin\UserController::class, 'loginAs'])->name('admin.users.login');
+    Route::post('/view/{user:id}/2fa', [Admin\UserController::class, 'disableTwoFactor'])->name('admin.users.2fa');
     Route::delete('/view/{user:id}', [Admin\UserController::class, 'delete']);
 });
 

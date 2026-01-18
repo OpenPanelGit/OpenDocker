@@ -23,6 +23,13 @@ class UserFormRequest extends AdminFormRequest
             'password',
             'language',
             'root_admin',
+            'coins',
+            'bought_cpu',
+            'bought_memory',
+            'bought_disk',
+            'bought_slots',
+            'bought_databases',
+            'bought_backups',
         ])->toArray();
     }
 }
