@@ -1,51 +1,30 @@
 <?php
 
+use App\Http\Controllers\Api\Remote;
 use Illuminate\Support\Facades\Route;
-use Pterodactyl\Http\Controllers\Api\Remote\ActivityProcessingController;
-use Pterodactyl\Http\Controllers\Admin\Nodes\NodeInstallScriptController;
-use Pterodactyl\Http\Controllers\Api\Remote\DaemonConfigurationController;
-use Pterodactyl\Http\Controllers\Api\Remote\RusticConfigController;
-use Pterodactyl\Http\Controllers\Api\Remote\SftpAuthenticationController;
-use Pterodactyl\Http\Controllers\Api\Remote\Backups\BackupDeleteController;
-use Pterodactyl\Http\Controllers\Api\Remote\Backups\BackupRemoteUploadController;
-use Pterodactyl\Http\Controllers\Api\Remote\Backups\BackupSizeController;
-use Pterodactyl\Http\Controllers\Api\Remote\ElytraJobCompletionController;
-use Pterodactyl\Http\Controllers\Api\Remote\Servers\ServerDetailsController;
-use Pterodactyl\Http\Controllers\Api\Remote\Servers\ServerInstallController;
-use Pterodactyl\Http\Controllers\Api\Remote\Servers\ServerTransferController;
-use Pterodactyl\Http\Controllers\Api\Remote\Backups;
 
-// Routes for the Wings daemon.
-Route::post('/sftp/auth', SftpAuthenticationController::class);
+// Routes for the daemon.
+Route::post('/sftp/auth', Remote\SftpAuthenticationController::class);
 
-Route::get('/servers', [ServerDetailsController::class, 'list']);
-Route::post('/servers/reset', [ServerDetailsController::class, 'resetState']);
-Route::post('/activity', ActivityProcessingController::class);
+Route::get('/servers', [Remote\Servers\ServerDetailsController::class, 'list']);
+Route::post('/servers/reset', [Remote\Servers\ServerDetailsController::class, 'resetState']);
+Route::post('/activity', Remote\ActivityProcessingController::class);
 
-Route::group(['prefix' => '/servers/{uuid}'], function () {
-    Route::get('/', ServerDetailsController::class);
-    Route::get('/install', [ServerInstallController::class, 'index']);
-    Route::post('/install', [ServerInstallController::class, 'store']);
+Route::prefix('/servers/{server:uuid}')->group(function () {
+    Route::get('/', Remote\Servers\ServerDetailsController::class);
+    Route::get('/install', [Remote\Servers\ServerInstallController::class, 'index']);
+    Route::post('/install', [Remote\Servers\ServerInstallController::class, 'store']);
 
-    Route::get('/rustic-config', [RusticConfigController::class, 'show']);
-    Route::post('/backup-sizes', [BackupSizeController::class, 'update']);
+    Route::get('/transfer/failure', [Remote\Servers\ServerTransferController::class, 'failure']);
+    Route::get('/transfer/success', [Remote\Servers\ServerTransferController::class, 'success']);
+    Route::post('/transfer/failure', [Remote\Servers\ServerTransferController::class, 'failure']);
+    Route::post('/transfer/success', [Remote\Servers\ServerTransferController::class, 'success']);
 
-    Route::get('/transfer/failure', [ServerTransferController::class, 'failure']);
-    Route::get('/transfer/success', [ServerTransferController::class, 'success']);
-    Route::post('/transfer/failure', [ServerTransferController::class, 'failure']);
-    Route::post('/transfer/success', [ServerTransferController::class, 'success']);
+    Route::post('/container/status', [Remote\Servers\ServerContainersController::class, 'status']);
 });
 
-Route::group(['prefix' => '/backups'], function () {
-    Route::get('/{backup}', BackupRemoteUploadController::class);
-    Route::delete('/{backup}', BackupDeleteController::class);
-    Route::post('/{backup}', [Backups\BackupStatusController::class, 'index']); // NOTE: These are wings only paths, I need to make them use the DaemonType middleware
-    Route::post('/{backup}/restore', [Backups\BackupStatusController::class, 'restore']);
+Route::prefix('/backups')->group(function () {
+    Route::get('/{backup:uuid}', Remote\Backups\BackupRemoteUploadController::class);
+    Route::post('/{backup:uuid}', [Remote\Backups\BackupStatusController::class, 'index']);
+    Route::post('/{backup:uuid}/restore', [Remote\Backups\BackupStatusController::class, 'restore']);
 });
-
-Route::group(['prefix' => '/elytra-jobs'], function () {
-    Route::put('/{jobId}', [ElytraJobCompletionController::class, 'update']);
-});
-
-Route::get('/install/{uuid}', NodeInstallScriptController::class)->name('daemon.install');
-Route::get('/config/{uuid}', DaemonConfigurationController::class)->name('daemon.configuration');

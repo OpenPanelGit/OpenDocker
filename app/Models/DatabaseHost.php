@@ -1,10 +1,17 @@
 <?php
 
-namespace Pterodactyl\Models;
+namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Contracts\Validatable;
+use App\Traits\HasValidation;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Connection;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -15,26 +22,23 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property string $password
  * @property int|null $max_databases
  * @property int|null $node_id
- * @property \Carbon\CarbonImmutable $created_at
- * @property \Carbon\CarbonImmutable $updated_at
+ * @property CarbonImmutable $created_at
+ * @property CarbonImmutable $updated_at
+ * @property Collection|Node[] $nodes
+ * @property int|null $nodes_count
+ * @property Collection|Database[] $databases
+ * @property int|null $databases_count
  */
-class DatabaseHost extends Model
+class DatabaseHost extends Model implements Validatable
 {
-    /** @use HasFactory<\Database\Factories\DatabaseHostFactory> */
     use HasFactory;
+    use HasValidation;
 
     /**
      * The resource name for this model when it is transformed into an
-     * API representation using fractal.
+     * API representation using fractal. Also used as name for api key permissions.
      */
     public const RESOURCE_NAME = 'database_host';
-
-    protected bool $immutableDates = true;
-
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'database_hosts';
 
     /**
      * The attributes excluded from the model's JSON form.
@@ -45,42 +49,34 @@ class DatabaseHost extends Model
      * Fields that are mass assignable.
      */
     protected $fillable = [
-        'name',
-        'host',
-        'port',
-        'username',
-        'password',
-        'max_databases',
-        'node_id',
+        'name', 'host', 'port', 'username', 'password', 'max_databases',
     ];
 
-    /**
-     * Cast values to correct type.
-     */
-    protected $casts = [
-        'id' => 'integer',
-        'max_databases' => 'integer',
-        'node_id' => 'integer',
-    ];
-
-    /**
-     * Validation rules to assign to this model.
-     */
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'name' => 'required|string|max:191',
-        'host' => 'required|string|regex:/^[\w\-\.]+$/',
-        'port' => 'required|numeric|between:1,65535',
-        'username' => 'required|string|max:32',
-        'password' => 'nullable|string',
-        'node_id' => 'sometimes|nullable|integer|exists:nodes,id',
+        'name' => ['required', 'string', 'max:255'],
+        'host' => ['required', 'string'],
+        'port' => ['required', 'numeric', 'between:1,65535'],
+        'username' => ['required', 'string', 'max:32'],
+        'password' => ['nullable', 'string'],
+        'node_ids' => ['nullable', 'array'],
+        'node_ids.*' => ['required', 'integer', 'exists:nodes,id'],
     ];
 
-    /**
-     * Gets the node associated with a database host.
-     */
-    public function node(): BelongsTo
+    protected function casts(): array
     {
-        return $this->belongsTo(Node::class);
+        return [
+            'id' => 'integer',
+            'max_databases' => 'integer',
+            'password' => 'encrypted',
+            'created_at' => 'immutable_datetime',
+            'updated_at' => 'immutable_datetime',
+        ];
+    }
+
+    public function nodes(): BelongsToMany
+    {
+        return $this->belongsToMany(Node::class);
     }
 
     /**
@@ -89,5 +85,22 @@ class DatabaseHost extends Model
     public function databases(): HasMany
     {
         return $this->hasMany(Database::class);
+    }
+
+    public function buildConnection(string $database = 'mysql', string $charset = 'utf8', string $collation = 'utf8_unicode_ci'): Connection
+    {
+        /** @var Connection $connection */
+        $connection = DB::build([
+            'driver' => 'mysql',
+            'host' => $this->host,
+            'port' => $this->port,
+            'database' => $database,
+            'username' => $this->username,
+            'password' => $this->password,
+            'charset' => $charset,
+            'collation' => $collation,
+        ]);
+
+        return $connection;
     }
 }

@@ -1,55 +1,26 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client;
+namespace App\Tests\Integration\Api\Client;
 
-use Pterodactyl\Models\Node;
-use Pterodactyl\Models\Task;
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Model;
-use Pterodactyl\Models\Backup;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Database;
-use Pterodactyl\Models\Location;
-use Pterodactyl\Models\Schedule;
+use App\Models\Allocation;
+use App\Models\Backup;
+use App\Models\Schedule;
+use App\Models\Server;
+use App\Models\Task;
+use App\Tests\Integration\IntegrationTestCase;
+use App\Transformers\Api\Client\BaseClientTransformer;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Pterodactyl\Models\Allocation;
-use Pterodactyl\Models\DatabaseHost;
-use Pterodactyl\Tests\Integration\TestResponse;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
-use Illuminate\Database\Eloquent\Model as EloquentModel;
-use Pterodactyl\Transformers\Api\Client\BaseClientTransformer;
 
 abstract class ClientApiIntegrationTestCase extends IntegrationTestCase
 {
     /**
-     * Cleanup after running tests.
-     */
-    protected function tearDown(): void
-    {
-        Database::query()->forceDelete();
-        DatabaseHost::query()->forceDelete();
-        Backup::query()->forceDelete();
-        Server::query()->forceDelete();
-        Node::query()->forceDelete();
-        Location::query()->forceDelete();
-        User::query()->forceDelete();
-
-        parent::tearDown();
-    }
-
-    /**
      * Override the default createTestResponse from Illuminate so that we can
      * just dump 500-level errors to the screen in the tests without having
      * to keep re-assigning variables.
-     *
-     * @param \Illuminate\Http\Response $response
-     * @param \Illuminate\Http\Request $request
-     *
-     * @return \Illuminate\Testing\TestResponse
-     */
-    protected function createTestResponse($response, $request)
+    protected function createTestResponse($response, $request): \Illuminate\Testing\TestResponse
     {
-        return TestResponse::fromBaseResponse($response, $request);
+        return TestResponse::fromBaseResponse($response);
     }
 
     /**
@@ -84,10 +55,10 @@ abstract class ClientApiIntegrationTestCase extends IntegrationTestCase
      * Asserts that the data passed through matches the output of the data from the transformer. This
      * will remove the "relationships" key when performing the comparison.
      */
-    protected function assertJsonTransformedWith(array $data, Model|EloquentModel $model)
+    protected function assertJsonTransformedWith(array $data, Model $model): void
     {
         $reflect = new \ReflectionClass($model);
-        $transformer = sprintf('\\Pterodactyl\\Transformers\\Api\\Client\\%sTransformer', $reflect->getShortName());
+        $transformer = sprintf('\\App\\Transformers\\Api\\Client\\%sTransformer', $reflect->getShortName());
 
         $transformer = new $transformer();
         $this->assertInstanceOf(BaseClientTransformer::class, $transformer);

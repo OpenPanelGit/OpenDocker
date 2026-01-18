@@ -1,10 +1,10 @@
 <?php
 
-namespace Pterodactyl\Providers;
+namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Pterodactyl\Extensions\Backups\BackupManager;
+use App\Extensions\Backups\BackupManager;
 use Illuminate\Contracts\Support\DeferrableProvider;
+use Illuminate\Support\ServiceProvider;
 
 class BackupsServiceProvider extends ServiceProvider implements DeferrableProvider
 {
@@ -18,6 +18,9 @@ class BackupsServiceProvider extends ServiceProvider implements DeferrableProvid
         });
     }
 
+    /**
+     * @return class-string[]
+     */
     public function provides(): array
     {
         return [BackupManager::class];

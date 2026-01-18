@@ -1,21 +1,26 @@
 includes:
-    - ./vendor/larastan/larastan/extension.neon
+    - vendor/larastan/larastan/extension.neon
+
+rules:
+    - App\PHPStan\ForbiddenGlobalFunctionsRule
 
 parameters:
-    # Level 9 is the highest level
-    level: 4
+
     paths:
-        - app/
+        - app
+
+    level: 6
+
     ignoreErrors:
-        # Ignore repository interface missing methods
-        - '#Call to an undefined method Pterodactyl\\Repositories\\Wings\\DaemonRepository::(\w+)\(\)#'
+        - identifier: argument.templateType
+        - identifier: missingType.generics
+        - '#Call to an undefined method Filament\\Forms\\Components\\(.+)::hintCopy\(\)#'
 
-        # Ignore magic spatie calls
-        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Builder::allowed(\w+)\(\)#'
-    excludePaths:
-        - app/Repositories
-
-        # More magic spatie to be replaced
-        - app/Extensions/Spatie/Fractalistic/Fractal.php
-    #
-    #    checkMissingIterableValueType: false
+        # We are getting and setting environment variables directly
+        -
+            identifier: larastan.noEnvCallsOutsideOfConfig
+            paths:
+                - app/Console/Commands/Environment/*.php
+                - app/Extensions/Captcha/Schemas/*.php
+                - app/Extensions/OAuth/Schemas/*.php
+                - app/Filament/Admin/Pages/Settings.php

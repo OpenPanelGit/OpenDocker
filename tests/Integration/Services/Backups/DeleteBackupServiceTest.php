@@ -1,22 +1,20 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Services\Backups;
+namespace App\Tests\Integration\Services\Backups;
 
-use GuzzleHttp\Psr7\Request;
+use App\Exceptions\Service\Backup\BackupLockedException;
+use App\Extensions\Backups\BackupManager;
+use App\Extensions\Filesystem\S3Filesystem;
+use App\Models\Backup;
+use App\Repositories\Daemon\DaemonBackupRepository;
+use App\Services\Backups\DeleteBackupService;
+use App\Tests\Integration\IntegrationTestCase;
 use GuzzleHttp\Psr7\Response;
-use Pterodactyl\Models\Backup;
-use GuzzleHttp\Exception\ClientException;
-use Pterodactyl\Extensions\Backups\BackupManager;
-use Pterodactyl\Extensions\Filesystem\S3Filesystem;
-use Pterodactyl\Services\Backups\DeleteBackupService;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
-use Pterodactyl\Repositories\Wings\DaemonBackupRepository;
-use Pterodactyl\Exceptions\Service\Backup\BackupLockedException;
-use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Illuminate\Http\Client\ConnectionException;
 
 class DeleteBackupServiceTest extends IntegrationTestCase
 {
-    public function testLockedBackupCannotBeDeleted()
+    public function test_locked_backup_cannot_be_deleted(): void
     {
         $server = $this->createServerModel();
         $backup = Backup::factory()->create([
@@ -29,7 +27,7 @@ class DeleteBackupServiceTest extends IntegrationTestCase
         $this->app->make(DeleteBackupService::class)->handle($backup);
     }
 
-    public function testFailedBackupThatIsLockedCanBeDeleted()
+    public function test_failed_backup_that_is_locked_can_be_deleted(): void
     {
         $server = $this->createServerModel();
         $backup = Backup::factory()->create([
@@ -48,17 +46,13 @@ class DeleteBackupServiceTest extends IntegrationTestCase
         $this->assertNotNull($backup->deleted_at);
     }
 
-    public function testExceptionThrownDueToMissingBackupIsIgnored()
+    public function test_exception_thrown_due_to_missing_backup_is_ignored(): void
     {
         $server = $this->createServerModel();
         $backup = Backup::factory()->create(['server_id' => $server->id]);
 
         $mock = $this->mock(DaemonBackupRepository::class);
-        $mock->expects('setServer->delete')->with($backup)->andThrow(
-            new DaemonConnectionException(
-                new ClientException('', new Request('DELETE', '/'), new Response(404))
-            )
-        );
+        $mock->expects('setServer->delete')->with($backup)->andThrow(new ConnectionException(code: 404));
 
         $this->app->make(DeleteBackupService::class)->handle($backup);
 
@@ -67,19 +61,15 @@ class DeleteBackupServiceTest extends IntegrationTestCase
         $this->assertNotNull($backup->deleted_at);
     }
 
-    public function testExceptionIsThrownIfNot404()
+    public function test_exception_is_thrown_if_not404(): void
     {
         $server = $this->createServerModel();
         $backup = Backup::factory()->create(['server_id' => $server->id]);
 
         $mock = $this->mock(DaemonBackupRepository::class);
-        $mock->expects('setServer->delete')->with($backup)->andThrow(
-            new DaemonConnectionException(
-                new ClientException('', new Request('DELETE', '/'), new Response(500))
-            )
-        );
+        $mock->expects('setServer->delete')->with($backup)->andThrow(new ConnectionException(code: 500));
 
-        $this->expectException(DaemonConnectionException::class);
+        $this->expectException(ConnectionException::class);
 
         $this->app->make(DeleteBackupService::class)->handle($backup);
 
@@ -88,7 +78,7 @@ class DeleteBackupServiceTest extends IntegrationTestCase
         $this->assertNull($backup->deleted_at);
     }
 
-    public function testS3ObjectCanBeDeleted()
+    public function test_s3_object_can_be_deleted(): void
     {
         $server = $this->createServerModel();
         $backup = Backup::factory()->create([

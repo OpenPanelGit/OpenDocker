@@ -1,13 +1,15 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Subusers;
+namespace App\Http\Requests\Api\Client\Servers\Subusers;
 
+use App\Exceptions\Http\HttpForbiddenException;
+use App\Http\Requests\Api\Client\ClientApiRequest;
+use App\Models\Server;
+use App\Models\Subuser;
+use App\Models\User;
+use App\Services\Servers\GetUserPermissionsService;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Http\Request;
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Subuser;
-use Pterodactyl\Exceptions\Http\HttpForbiddenException;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
-use Pterodactyl\Services\Servers\GetUserPermissionsService;
 
 abstract class SubuserRequest extends ClientApiRequest
 {
@@ -16,7 +18,7 @@ abstract class SubuserRequest extends ClientApiRequest
     /**
      * Authorize the request and ensure that a user is not trying to modify themselves.
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws BindingResolutionException
      */
     public function authorize(): bool
     {
@@ -47,23 +49,24 @@ abstract class SubuserRequest extends ClientApiRequest
      * Validates that the permissions we are trying to assign can actually be assigned
      * by the user making the request.
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @param  string[]  $permissions
+     *
+     * @throws BindingResolutionException
      */
-    protected function validatePermissionsCanBeAssigned(array $permissions)
+    protected function validatePermissionsCanBeAssigned(array $permissions): void
     {
         $user = $this->user();
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var Server $server */
         $server = $this->route()->parameter('server');
 
-        // If we are a root admin or the server owner, no need to perform these checks.
-        if ($user->root_admin || $user->id === $server->owner_id) {
+        // If we are an admin or the server owner, no need to perform these checks.
+        if ($user->can('update', $server) || $user->id === $server->owner_id) {
             return;
         }
 
         // Otherwise, get the current subuser's permission set, and ensure that the
         // permissions they are trying to assign are not _more_ than the ones they
         // already have.
-        /** @var Subuser|null $subuser */
         /** @var GetUserPermissionsService $service */
         $service = $this->container->make(GetUserPermissionsService::class);
 

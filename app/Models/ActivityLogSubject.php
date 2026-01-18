@@ -1,46 +1,45 @@
 <?php
 
-namespace Pterodactyl\Models;
+namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 /**
- * \Pterodactyl\Models\ActivityLogSubject.
+ * \App\Models\ActivityLogSubject.
  *
  * @property int $id
  * @property int $activity_log_id
  * @property int $subject_id
  * @property string $subject_type
  * @property ActivityLog|null $activityLog
- * @property \Illuminate\Database\Eloquent\Model|\Eloquent $subject
+ * @property Model|\Eloquent $subject
  *
- * @method static \Illuminate\Database\Eloquent\Builder|ActivityLogSubject newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|ActivityLogSubject newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|ActivityLogSubject query()
- *
- * @mixin \Eloquent
+ * @method static Builder|ActivityLogSubject newModelQuery()
+ * @method static Builder|ActivityLogSubject newQuery()
+ * @method static Builder|ActivityLogSubject query()
  */
 class ActivityLogSubject extends Pivot
 {
     public $incrementing = true;
+
     public $timestamps = false;
 
     protected $table = 'activity_log_subjects';
 
     protected $guarded = ['id'];
 
-    public function activityLog()
+    public function activityLog(): BelongsTo
     {
         return $this->belongsTo(ActivityLog::class);
     }
 
-    public function subject()
+    public function subject(): MorphTo
     {
-        $morph = $this->morphTo();
-        if (method_exists($morph, 'withTrashed')) {
-            return $morph->withTrashed();
-        }
-
-        return $morph;
+        return $this->morphTo()->withoutGlobalScope(SoftDeletingScope::class);
     }
 }

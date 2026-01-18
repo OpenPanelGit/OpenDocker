@@ -1,23 +1,28 @@
 <?php
 
-namespace Pterodactyl\Models;
+namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Contracts\Validatable;
+use App\Traits\HasValidation;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $id
  * @property int $egg_id
+ * @property null $sort
  * @property string $name
  * @property string $description
  * @property string $env_variable
  * @property string $default_value
  * @property bool $user_viewable
  * @property bool $user_editable
- * @property string $rules
- * @property \Carbon\CarbonImmutable $created_at
- * @property \Carbon\CarbonImmutable $updated_at
+ * @property string[] $rules
+ * @property CarbonImmutable $created_at
+ * @property CarbonImmutable $updated_at
  * @property bool $required
  * @property Egg $egg
  * @property ServerVariable $serverVariable
@@ -26,10 +31,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * using the server relationship.
  * @property string|null $server_value
  */
-class EggVariable extends Model
+class EggVariable extends Model implements Validatable
 {
-    /** @use HasFactory<\Database\Factories\EggVariableFactory> */
     use HasFactory;
+    use HasValidation { getRules as getValidationRules; }
 
     /**
      * The resource name for this model when it is transformed into an
@@ -40,48 +45,61 @@ class EggVariable extends Model
     /**
      * Reserved environment variable names.
      */
-    public const RESERVED_ENV_NAMES = 'SERVER_MEMORY,SERVER_IP,SERVER_PORT,ENV,HOME,USER,STARTUP,SERVER_UUID,UUID';
-
-    protected bool $immutableDates = true;
-
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'egg_variables';
+    public const RESERVED_ENV_NAMES = ['P_SERVER_UUID', 'P_SERVER_ALLOCATION_LIMIT', 'SERVER_MEMORY', 'SERVER_IP', 'SERVER_PORT', 'ENV', 'HOME', 'USER', 'STARTUP', 'MODIFIED_STARTUP', 'SERVER_UUID', 'UUID', 'INTERNAL_IP', 'HOSTNAME', 'TERM', 'LANG', 'PWD', 'TZ', 'TIMEZONE'];
 
     /**
      * Fields that are not mass assignable.
      */
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
-    /**
-     * Cast values to correct type.
-     */
-    protected $casts = [
-        'egg_id' => 'integer',
-        'user_viewable' => 'bool',
-        'user_editable' => 'bool',
+    /** @var array<string, string[]> */
+    public static array $validationRules = [
+        'egg_id' => ['exists:eggs,id'],
+        'sort' => ['nullable'],
+        'name' => ['required', 'string', 'between:1,255'],
+        'description' => ['string'],
+        'default_value' => ['string'],
+        'user_viewable' => ['boolean'],
+        'user_editable' => ['boolean'],
+        'rules' => ['array'],
+        'rules.*' => ['string'],
     ];
 
-    public static array $validationRules = [
-        'egg_id' => 'exists:eggs,id',
-        'name' => 'required|string|between:1,191',
-        'description' => 'string',
-        'env_variable' => 'required|regex:/^[\w]{1,191}$/|notIn:' . self::RESERVED_ENV_NAMES,
-        'default_value' => 'string',
-        'user_viewable' => 'boolean',
-        'user_editable' => 'boolean',
-        'rules' => 'required|string',
-    ];
+    /**
+     * Implement language verification by overriding Eloquence's gather rules function.
+     *
+     * @return array<string|string[]>
+     */
+    public static function getRules(): array
+    {
+        $rules = self::getValidationRules();
+
+        $rules['env_variable'] = ['required', 'alphaDash', 'between:1,255', 'notIn:' . implode(',', EggVariable::RESERVED_ENV_NAMES)];
+
+        return $rules;
+    }
 
     protected $attributes = [
         'user_editable' => 0,
         'user_viewable' => 0,
+        'rules' => '[]',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'egg_id' => 'integer',
+            'user_viewable' => 'bool',
+            'user_editable' => 'bool',
+            'rules' => 'array',
+            'created_at' => 'immutable_datetime',
+            'updated_at' => 'immutable_datetime',
+        ];
+    }
 
     public function getRequiredAttribute(): bool
     {
-        return in_array('required', explode('|', $this->rules));
+        return in_array('required', $this->rules);
     }
 
     public function egg(): HasOne

@@ -1,11 +1,12 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\Allocation;
+namespace App\Tests\Integration\Api\Client\Server\Allocation;
 
+use App\Enums\SubuserPermission;
+use App\Models\Allocation;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Illuminate\Http\Response;
-use Pterodactyl\Models\Allocation;
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class DeleteAllocationTest extends ClientApiIntegrationTestCase
 {
@@ -13,14 +14,14 @@ class DeleteAllocationTest extends ClientApiIntegrationTestCase
      * Test that an allocation is deleted from the server and the notes are properly reset
      * to an empty value on assignment.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('permissionDataProvider')]
-    public function testAllocationCanBeDeletedFromServer(array $permission)
+    #[DataProvider('permissionDataProvider')]
+    public function test_allocation_can_be_deleted_from_server(array $permission): void
     {
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount($permission);
         $server->update(['allocation_limit' => 2]);
 
-        /** @var Allocation $allocation */
+        /** @var \App\Models\Allocation $allocation */
         $allocation = Allocation::factory()->create([
             'server_id' => $server->id,
             'node_id' => $server->node_id,
@@ -33,14 +34,31 @@ class DeleteAllocationTest extends ClientApiIntegrationTestCase
     }
 
     /**
+     * Test that an allocation is deleted if it is currently marked as the primary allocation
+     * for the server.
+     */
+    public function test_primary_allocation_can_be_deleted_from_server(): void
+    {
+        /** @var \App\Models\Server $server */
+        [$user, $server] = $this->generateTestAccount();
+        $server->update(['allocation_limit' => 2]);
+
+        $allocation = $server->allocation;
+
+        $this->actingAs($user)->deleteJson($this->link($allocation))->assertStatus(Response::HTTP_NO_CONTENT);
+
+        $this->assertDatabaseHas('allocations', ['id' => $allocation->id, 'server_id' => null, 'notes' => null]);
+    }
+
+    /**
      * Test that an error is returned if the user does not have permissiont to delete an allocation.
      */
-    public function testErrorIsReturnedIfUserDoesNotHavePermission()
+    public function test_error_is_returned_if_user_does_not_have_permission(): void
     {
-        /** @var \Pterodactyl\Models\Server $server */
-        [$user, $server] = $this->generateTestAccount([Permission::ACTION_ALLOCATION_CREATE]);
+        /** @var \App\Models\Server $server */
+        [$user, $server] = $this->generateTestAccount([SubuserPermission::AllocationCreate]);
 
-        /** @var Allocation $allocation */
+        /** @var \App\Models\Allocation $allocation */
         $allocation = Allocation::factory()->create([
             'server_id' => $server->id,
             'node_id' => $server->node_id,
@@ -52,27 +70,11 @@ class DeleteAllocationTest extends ClientApiIntegrationTestCase
         $this->assertDatabaseHas('allocations', ['id' => $allocation->id, 'server_id' => $server->id]);
     }
 
-    /**
-     * Test that an allocation is not deleted if it is currently marked as the primary allocation
-     * for the server.
-     */
-    public function testErrorIsReturnedIfAllocationIsPrimary()
-    {
-        /** @var \Pterodactyl\Models\Server $server */
-        [$user, $server] = $this->generateTestAccount();
-        $server->update(['allocation_limit' => 2]);
-
-        $this->actingAs($user)->deleteJson($this->link($server->allocation))
-            ->assertStatus(Response::HTTP_BAD_REQUEST)
-            ->assertJsonPath('errors.0.code', 'DisplayException')
-            ->assertJsonPath('errors.0.detail', 'You cannot delete the primary allocation for this server.');
-    }
-
-    public function testAllocationCannotBeDeletedIfServerLimitIsNotDefined()
+    public function test_allocation_cannot_be_deleted_if_server_limit_is_not_defined(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
-        /** @var Allocation $allocation */
+        /** @var \App\Models\Allocation $allocation */
         $allocation = Allocation::factory()->forServer($server)->create(['notes' => 'Test notes']);
 
         $this->actingAs($user)->deleteJson($this->link($allocation))
@@ -87,9 +89,9 @@ class DeleteAllocationTest extends ClientApiIntegrationTestCase
     /**
      * Test that an allocation cannot be deleted if it does not belong to the server instance.
      */
-    public function testErrorIsReturnedIfAllocationDoesNotBelongToServer()
+    public function test_error_is_returned_if_allocation_does_not_belong_to_server(): void
     {
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount();
         [, $server2] = $this->generateTestAccount();
 
@@ -99,6 +101,6 @@ class DeleteAllocationTest extends ClientApiIntegrationTestCase
 
     public static function permissionDataProvider(): array
     {
-        return [[[Permission::ACTION_ALLOCATION_DELETE]], [[]]];
+        return [[[SubuserPermission::AllocationDelete]], [[]]];
     }
 }

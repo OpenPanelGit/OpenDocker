@@ -1,28 +1,26 @@
 <?php
 
-namespace Pterodactyl\Services\Servers;
+namespace App\Services\Servers;
 
-use Pterodactyl\Models\Mount;
-use Pterodactyl\Models\Server;
+use App\Extensions\Features\FeatureService;
+use App\Models\Egg;
+use App\Models\Mount;
+use App\Models\Server;
 
 class ServerConfigurationStructureService
 {
-    /**
-     * ServerConfigurationStructureService constructor.
-     */
-    public function __construct(
-        private EnvironmentService $environment,
-        private StartupCommandService $startupCommandService
-    ) {
-    }
+    public function __construct(private EnvironmentService $environment, private FeatureService $featureService) {}
 
     /**
      * Return a configuration array for a specific server when passed a server model.
      *
-     * DO NOT MODIFY THIS FUNCTION. This powers legacy code handling for the new Wings
+     * DO NOT MODIFY THIS FUNCTION. This powers legacy code handling for the new daemon
      * daemon, if you modify the structure eggs will break unexpectedly.
+     *
+     * @param  array<array-key, mixed>  $override
+     * @return array<array-key, mixed>
      */
-    public function handle(Server $server, array $override = [], bool $legacy = false): array
+    public function handle(Server $server, array $override = []): array
     {
         $clone = $server;
         // If any overrides have been set on this call make sure to update them on the
@@ -34,17 +32,44 @@ class ServerConfigurationStructureService
             }
         }
 
-        return $legacy
-            ? $this->returnLegacyFormat($clone)
-            : $this->returnCurrentFormat($clone);
+        return $this->returnFormat($clone);
     }
 
     /**
-     * Returns the new data format used for the Wings daemon.
+     * Returns the data format used for the daemon.
+     *
+     * @return array{
+     *     uuid: string,
+     *     meta: array{name: string, description: string},
+     *     suspended: bool,
+     *     environment: array<string, mixed>,
+     *     invocation: string,
+     *     skip_egg_scripts: bool,
+     *     build: array{
+     *         memory_limit: int,
+     *         swap: int,
+     *         io_weight: int,
+     *         cpu_limit: int,
+     *         threads: ?string,
+     *         disk_space: int,
+     *         oom_killer: bool,
+     *     },
+     *     container: array{image: string, requires_rebuild: false},
+     *     allocations: array{
+     *         force_outgoing_ip: bool,
+     *         default: array{ip: string, port: int},
+     *         mappings: array<string, array<int>>,
+     *     },
+     *     egg: array{id: string, file_denylist: string[], features: string[][]},
+     *     labels?: string[],
+     *     mounts: array{source: string, target: string, read_only: bool},
+     * }
+     *
+     * @todo convert to API Resource
      */
-    protected function returnCurrentFormat(Server $server): array
+    protected function returnFormat(Server $server): array
     {
-        return [
+        $response = [
             'uuid' => $server->uuid,
             'meta' => [
                 'name' => $server->name,
@@ -52,82 +77,50 @@ class ServerConfigurationStructureService
             ],
             'suspended' => $server->isSuspended(),
             'environment' => $this->environment->handle($server),
-            'invocation' => $this->startupCommandService->handle($server),
+            'invocation' => $server->startup,
             'skip_egg_scripts' => $server->skip_scripts,
             'build' => [
-                'memory_limit' => $server->memory + $server->overhead_memory,
-                'swap' => $server->swap,
+                'memory_limit' => (int) round(config('panel.use_binary_prefix') ? $server->memory : $server->memory / 1.048576),
+                'swap' => (int) round(config('panel.use_binary_prefix') ? $server->swap : $server->swap / 1.048576),
                 'io_weight' => $server->io,
                 'cpu_limit' => $server->cpu,
                 'threads' => $server->threads,
-                'disk_space' => $server->disk,
-                'oom_disabled' => $server->oom_disabled,
+                'disk_space' => (int) round(config('panel.use_binary_prefix') ? $server->disk : $server->disk / 1.048576),
+                'oom_killer' => $server->oom_killer,
             ],
             'container' => [
                 'image' => $server->image,
-                // This field is deprecated — use the value in the "build" block.
-                //
-                // TODO: remove this key in V2.
-                'oom_disabled' => $server->oom_disabled,
                 'requires_rebuild' => false,
             ],
             'allocations' => [
                 'force_outgoing_ip' => $server->egg->force_outgoing_ip,
                 'default' => [
-                    'ip' => $server->allocation->ip,
-                    'port' => $server->allocation->port,
+                    'ip' => $server->allocation->ip ?? '127.0.0.1',
+                    'port' => $server->allocation->port ?? 0,
                 ],
                 'mappings' => $server->getAllocationMappings(),
             ],
-            'mounts' => $server->mounts->map(function (Mount $mount) {
+            'egg' => [
+                'id' => $server->egg->uuid,
+                'file_denylist' => $server->egg->inherit_file_denylist,
+                'features' => $this->featureService->getMappings($server->egg->features),
+            ],
+        ];
+
+        if (!empty($server->docker_labels)) {
+            $response['labels'] = $server->docker_labels;
+        }
+
+        if ($server->mounts->isNotEmpty()) {
+            $response['mounts'] = $server->mounts->map(function (Mount $mount) {
                 return [
                     'source' => $mount->source,
                     'target' => $mount->target,
                     'read_only' => $mount->read_only,
                 ];
-            }),
-            'egg' => [
-                'id' => $server->egg->uuid,
-                'file_denylist' => $server->egg->inherit_file_denylist,
-            ],
-        ];
-    }
+            })->toArray();
+        }
 
-    /**
-     * Returns the legacy server data format to continue support for old egg configurations
-     * that have not yet been updated.
-     *
-     * @deprecated
-     */
-    protected function returnLegacyFormat(Server $server): array
-    {
-        return [
-            'uuid' => $server->uuid,
-            'build' => [
-                'default' => [
-                    'ip' => $server->allocation->ip,
-                    'port' => $server->allocation->port,
-                ],
-                'ports' => $server->allocations->groupBy('ip')->map(function ($item) {
-                    return $item->pluck('port');
-                })->toArray(),
-                'env' => $this->environment->handle($server),
-                'oom_disabled' => $server->oom_disabled,
-                'memory' => (int) $server->memory,
-                'overhead_memory' => (int) $server->overhead_memory,
-                'swap' => (int) $server->swap,
-                'io' => (int) $server->io,
-                'cpu' => (int) $server->cpu,
-                'threads' => $server->threads,
-                'disk' => (int) $server->disk,
-                'image' => $server->image,
-            ],
-            'service' => [
-                'egg' => $server->egg->uuid,
-                'skip_scripts' => $server->skip_scripts,
-            ],
-            'rebuild' => false,
-            'suspended' => $server->isSuspended() ? 1 : 0,
-        ];
+        return $response;
     }
 }

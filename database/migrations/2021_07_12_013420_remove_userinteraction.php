@@ -1,47 +1,35 @@
 <?php
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-class RemoveUserInteraction extends Migration
+return new class extends Migration
 {
-  /**
-   * Run the migrations.
-   */
-  public function up(): void
-  {
-    // Remove User Interaction from startup config
-    switch (DB::getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME)) {
-      case 'mysql':
-        DB::table('eggs')->update([
-          'config_startup' => DB::raw('JSON_REMOVE(config_startup, \'$.userInteraction\')'),
-        ]);
-        break;
-      case 'pgsql':
-        DB::table('eggs')->update([
-          'config_startup' => DB::raw('config_startup::jsonb - \'userInteraction\''),
-        ]);
-        break;
-    }
-  }
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        if (Schema::getConnection()->getDriverName() === 'pgsql') {
+            DB::table('eggs')->update([
+                'config_startup' => DB::raw("config_startup::jsonb - 'userInteraction'"),
+            ]);
 
-  /**
-   * Reverse the migrations.
-   */
-  public function down(): void
-  {
-    // Add blank User Interaction array back to startup config
-    switch (DB::getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME)) {
-      case 'mysql':
+            return;
+        }
+
+        // Remove User Interaction from startup config
         DB::table('eggs')->update([
-          'config_startup' => DB::raw('JSON_SET(config_startup, \'$.userInteraction\', JSON_ARRAY())'),
+            'config_startup' => DB::raw('JSON_REMOVE(config_startup, \'$.userInteraction\')'),
         ]);
-        break;
-      case 'pgsql':
-        DB::table('eggs')->update([
-          'config_startup' => DB::raw('jsonb_set(config_startup::jsonb, \'$.userInteraction\', jsonb_build_array())'),
-        ]);
-        break;
     }
-  }
-}
+
+    public function down(): void
+    {
+        // Add blank User Interaction array back to startup config
+        DB::table('eggs')->update([
+            'config_startup' => DB::raw('JSON_SET(config_startup, \'$.userInteraction\', JSON_ARRAY())'),
+        ]);
+    }
+};

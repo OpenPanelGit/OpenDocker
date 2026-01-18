@@ -1,21 +1,21 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Backups;
+namespace App\Http\Requests\Api\Client\Servers\Backups;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
 
 class StoreBackupRequest extends ClientApiRequest
 {
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_BACKUP_CREATE;
+        return SubuserPermission::BackupCreate;
     }
 
     public function rules(): array
     {
         return [
-            'name' => 'nullable|string|max:191',
+            'name' => 'nullable|string|max:255',
             'is_locked' => 'nullable|boolean',
             'ignored' => 'nullable|string',
         ];

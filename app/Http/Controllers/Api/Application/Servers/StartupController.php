@@ -1,14 +1,19 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Application\Servers;
+namespace App\Http\Controllers\Api\Application\Servers;
 
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Services\Servers\StartupModificationService;
-use Pterodactyl\Transformers\Api\Application\ServerTransformer;
-use Pterodactyl\Http\Controllers\Api\Application\ApplicationApiController;
-use Pterodactyl\Http\Requests\Api\Application\Servers\UpdateServerStartupRequest;
+use App\Exceptions\Model\DataValidationException;
+use App\Http\Controllers\Api\Application\ApplicationApiController;
+use App\Http\Requests\Api\Application\Servers\UpdateServerStartupRequest;
+use App\Models\Server;
+use App\Models\User;
+use App\Services\Servers\StartupModificationService;
+use App\Transformers\Api\Application\ServerTransformer;
+use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Validation\ValidationException;
 
+#[Group('Server', weight: 3)]
 class StartupController extends ApplicationApiController
 {
     /**
@@ -20,12 +25,15 @@ class StartupController extends ApplicationApiController
     }
 
     /**
+     * Update startup
+     *
      * Update the startup and environment settings for a specific server.
      *
-     * @throws \Illuminate\Validation\ValidationException
-     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
+     * @return array<array-key, mixed>
+     *
+     * @throws ValidationException
+     * @throws ConnectionException
+     * @throws DataValidationException
      */
     public function index(UpdateServerStartupRequest $request, Server $server): array
     {

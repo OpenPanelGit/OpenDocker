@@ -1,18 +1,22 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Client;
+namespace App\Http\Controllers\Api\Client;
 
+use App\Facades\Activity;
+use App\Http\Requests\Api\Client\Account\StoreSSHKeyRequest;
+use App\Http\Requests\Api\Client\ClientApiRequest;
+use App\Models\UserSSHKey;
+use App\Transformers\Api\Client\UserSSHKeyTransformer;
 use Illuminate\Http\JsonResponse;
-use Pterodactyl\Facades\Activity;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
-use Pterodactyl\Transformers\Api\Client\UserSSHKeyTransformer;
-use Pterodactyl\Http\Requests\Api\Client\Account\StoreSSHKeyRequest;
 
 class SSHKeyController extends ClientApiController
 {
     /**
-     * Returns all the SSH keys that have been configured for the logged-in
-     * user account.
+     * List ssh keys
+     *
+     * Returns all the SSH keys that have been configured for the logged-in user account.
+     *
+     * @return array<array-key, mixed>
      */
     public function index(ClientApiRequest $request): array
     {
@@ -22,7 +26,11 @@ class SSHKeyController extends ClientApiController
     }
 
     /**
+     * Create ssh keys
+     *
      * Stores a new SSH key for the authenticated user's account.
+     *
+     * @return array<array-key, mixed>
      */
     public function store(StoreSSHKeyRequest $request): array
     {
@@ -43,24 +51,23 @@ class SSHKeyController extends ClientApiController
     }
 
     /**
+     * Delete ssh keys
+     *
      * Deletes an SSH key from the user's account.
      */
-    public function delete(ClientApiRequest $request): JsonResponse
+    public function delete(ClientApiRequest $request, string $fingerprint): JsonResponse
     {
-        $this->validate($request, ['fingerprint' => ['required', 'string']]);
-
+        /** @var UserSSHKey $key */
         $key = $request->user()->sshKeys()
-            ->where('fingerprint', $request->input('fingerprint'))
-            ->first();
+            ->where('fingerprint', $fingerprint)
+            ->firstOrFail();
 
-        if (!is_null($key)) {
-            $key->delete();
+        Activity::event('user:ssh-key.delete')
+            ->subject($key)
+            ->property('fingerprint', $key->fingerprint)
+            ->log();
 
-            Activity::event('user:ssh-key.delete')
-                ->subject($key)
-                ->property('fingerprint', $key->fingerprint)
-                ->log();
-        }
+        $key->delete();
 
         return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
     }

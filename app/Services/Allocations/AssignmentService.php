@@ -1,35 +1,40 @@
 <?php
 
-namespace Pterodactyl\Services\Allocations;
+namespace App\Services\Allocations;
 
-use IPTools\Network;
-use Pterodactyl\Models\Node;
+use App\Exceptions\DisplayException;
+use App\Exceptions\Service\Allocation\CidrOutOfRangeException;
+use App\Exceptions\Service\Allocation\InvalidPortMappingException;
+use App\Exceptions\Service\Allocation\PortOutOfRangeException;
+use App\Exceptions\Service\Allocation\TooManyPortsInRangeException;
+use App\Models\Allocation;
+use App\Models\Node;
+use App\Models\Server;
+use Exception;
 use Illuminate\Database\ConnectionInterface;
-use Pterodactyl\Exceptions\DisplayException;
-use Pterodactyl\Contracts\Repository\AllocationRepositoryInterface;
-use Pterodactyl\Exceptions\Service\Allocation\CidrOutOfRangeException;
-use Pterodactyl\Exceptions\Service\Allocation\PortOutOfRangeException;
-use Pterodactyl\Exceptions\Service\Allocation\InvalidPortMappingException;
-use Pterodactyl\Exceptions\Service\Allocation\TooManyPortsInRangeException;
+use IPTools\Network;
 
 class AssignmentService
 {
     public const CIDR_MAX_BITS = 25;
+
     public const CIDR_MIN_BITS = 32;
+
     public const PORT_FLOOR = 1024;
+
     public const PORT_CEIL = 65535;
-    public const PORT_RANGE_LIMIT = 100000;
+
+    public const PORT_RANGE_LIMIT = 1000;
+
     public const PORT_RANGE_REGEX = '/^(\d{4,5})-(\d{4,5})$/';
 
-    /**
-     * AssignmentService constructor.
-     */
-    public function __construct(protected AllocationRepositoryInterface $repository, protected ConnectionInterface $connection)
-    {
-    }
+    public function __construct(protected ConnectionInterface $connection) {}
 
     /**
      * Insert allocations into the database and link them to a specific node.
+     *
+     * @param  array{allocation_ip: string, allocation_ports: array<int|string>}  $data
+     * @return array<int>
      *
      * @throws DisplayException
      * @throws CidrOutOfRangeException
@@ -37,7 +42,7 @@ class AssignmentService
      * @throws PortOutOfRangeException
      * @throws TooManyPortsInRangeException
      */
-    public function handle(Node $node, array $data): void
+    public function handle(Node $node, array $data, ?Server $server = null): array
     {
         $explode = explode('/', $data['allocation_ip']);
         if (count($explode) !== 1) {
@@ -47,31 +52,21 @@ class AssignmentService
         }
 
         try {
-            // TODO: how should we approach supporting IPv6 with this?
-            // gethostbyname only supports IPv4, but the alternative (dns_get_record) returns
-            // an array of records, which is not ideal for this use case, we need a SINGLE
-            // IP to use, not multiple.
-            $underlying = gethostbyname($data['allocation_ip']);
-            
-            // Validate that gethostbyname returned a valid IP
-            if (!filter_var($underlying, FILTER_VALIDATE_IP)) {
-                throw new DisplayException("gethostbyname returned invalid IP address: {$underlying} for input: {$data['allocation_ip']}");
-            }
-            
-            $parsed = Network::parse($underlying);
-        } catch (\Exception $exception) {
-            /* @noinspection PhpUndefinedVariableInspection */
-            throw new DisplayException("Could not parse provided allocation IP address ({$underlying}): {$exception->getMessage()}", $exception);
+            $parsed = Network::parse($data['allocation_ip']);
+        } catch (Exception $exception) {
+            throw new DisplayException("Could not parse provided allocation IP address ({$data['allocation_ip']}): {$exception->getMessage()}", $exception);
         }
 
         $this->connection->beginTransaction();
+
+        $ids = [];
         foreach ($parsed as $ip) {
             foreach ($data['allocation_ports'] as $port) {
                 if (!is_digit($port) && !preg_match(self::PORT_RANGE_REGEX, $port)) {
                     throw new InvalidPortMappingException($port);
                 }
 
-                $insertData = [];
+                $newAllocations = [];
                 if (preg_match(self::PORT_RANGE_REGEX, $port, $matches)) {
                     $block = range($matches[1], $matches[2]);
 
@@ -79,51 +74,48 @@ class AssignmentService
                         throw new TooManyPortsInRangeException();
                     }
 
-                    if ((int) $matches[1] <= self::PORT_FLOOR || (int) $matches[2] > self::PORT_CEIL) {
+                    if ((int) $matches[1] < self::PORT_FLOOR || (int) $matches[2] > self::PORT_CEIL) {
                         throw new PortOutOfRangeException();
                     }
 
                     foreach ($block as $unit) {
-                        $ipString = $ip->__toString();
-                        
-                        // Validate the IP string before insertion
-                        if (!filter_var($ipString, FILTER_VALIDATE_IP)) {
-                            throw new DisplayException("Invalid IP address generated: {$ipString}");
-                        }
-                        
-                        $insertData[] = [
+                        $newAllocations[] = [
                             'node_id' => $node->id,
-                            'ip' => $ipString,
+                            'ip' => $ip->__toString(),
                             'port' => (int) $unit,
                             'ip_alias' => array_get($data, 'allocation_alias'),
-                            'server_id' => null,
+                            'server_id' => $server->id ?? null,
+                            'is_locked' => array_get($data, 'is_locked', false),
                         ];
                     }
                 } else {
-                    if ((int) $port <= self::PORT_FLOOR || (int) $port > self::PORT_CEIL) {
+                    if ((int) $port < self::PORT_FLOOR || (int) $port > self::PORT_CEIL) {
                         throw new PortOutOfRangeException();
                     }
 
-                    $ipString = $ip->__toString();
-                    
-                    // Validate the IP string before insertion
-                    if (!filter_var($ipString, FILTER_VALIDATE_IP)) {
-                        throw new DisplayException("Invalid IP address generated: {$ipString}");
-                    }
-                    
-                    $insertData[] = [
+                    $newAllocations[] = [
                         'node_id' => $node->id,
-                        'ip' => $ipString,
+                        'ip' => $ip->__toString(),
                         'port' => (int) $port,
                         'ip_alias' => array_get($data, 'allocation_alias'),
-                        'server_id' => null,
+                        'server_id' => $server->id ?? null,
+                        'is_locked' => array_get($data, 'is_locked', false),
                     ];
                 }
 
-                $this->repository->insertIgnore($insertData);
+                foreach ($newAllocations as $newAllocation) {
+                    $allocation = Allocation::query()->create($newAllocation);
+                    $ids[] = $allocation->id;
+                }
             }
         }
 
+        if ($server && !$server->allocation_id) {
+            $server->update(['allocation_id' => $ids[0]]);
+        }
+
         $this->connection->commit();
+
+        return $ids;
     }
 }

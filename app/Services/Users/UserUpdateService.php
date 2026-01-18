@@ -1,26 +1,24 @@
 <?php
 
-namespace Pterodactyl\Services\Users;
+namespace App\Services\Users;
 
-use Pterodactyl\Models\User;
+use App\Models\User;
+use App\Traits\Services\HasUserLevels;
 use Illuminate\Contracts\Hashing\Hasher;
-use Pterodactyl\Traits\Services\HasUserLevels;
+use Throwable;
 
 class UserUpdateService
 {
     use HasUserLevels;
 
-    /**
-     * UserUpdateService constructor.
-     */
-    public function __construct(private Hasher $hasher)
-    {
-    }
+    public function __construct(private readonly Hasher $hasher) {}
 
     /**
      * Update the user model instance and return the updated model.
      *
-     * @throws \Throwable
+     * @param  array<array-key, mixed>  $data
+     *
+     * @throws Throwable
      */
     public function handle(User $user, array $data): User
     {

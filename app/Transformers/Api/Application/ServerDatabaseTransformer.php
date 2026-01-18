@@ -1,27 +1,15 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Application;
+namespace App\Transformers\Api\Application;
 
-use Pterodactyl\Models\Database;
+use App\Models\Database;
+use App\Models\DatabaseHost;
 use League\Fractal\Resource\Item;
-use Pterodactyl\Models\DatabaseHost;
 use League\Fractal\Resource\NullResource;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Illuminate\Contracts\Encryption\Encrypter;
 
 class ServerDatabaseTransformer extends BaseTransformer
 {
     protected array $availableIncludes = ['password', 'host'];
-
-    private Encrypter $encrypter;
-
-    /**
-     * Perform dependency injection.
-     */
-    public function handle(Encrypter $encrypter)
-    {
-        $this->encrypter = $encrypter;
-    }
 
     /**
      * Return the resource name for the JSONAPI output.
@@ -32,9 +20,9 @@ class ServerDatabaseTransformer extends BaseTransformer
     }
 
     /**
-     * Transform a database model in a representation for the application API.
+     * @param  Database  $model
      */
-    public function transform(Database $model): array
+    public function transform($model): array
     {
         return [
             'id' => $model->id,
@@ -56,19 +44,17 @@ class ServerDatabaseTransformer extends BaseTransformer
     {
         return $this->item($model, function (Database $model) {
             return [
-                'password' => $this->encrypter->decrypt($model->password),
+                'password' => $model->password,
             ];
         }, 'database_password');
     }
 
     /**
      * Return the database host relationship for this server database.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeHost(Database $model): Item|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_DATABASE_HOSTS)) {
+        if (!$this->authorize(DatabaseHost::RESOURCE_NAME)) {
             return $this->null();
         }
 

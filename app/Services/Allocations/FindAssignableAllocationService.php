@@ -1,74 +1,79 @@
 <?php
 
-namespace Pterodactyl\Services\Allocations;
+namespace App\Services\Allocations;
 
+use App\Exceptions\DisplayException;
+use App\Exceptions\Service\Allocation\AutoAllocationNotEnabledException;
+use App\Exceptions\Service\Allocation\CidrOutOfRangeException;
+use App\Exceptions\Service\Allocation\InvalidPortMappingException;
+use App\Exceptions\Service\Allocation\NoAutoAllocationSpaceAvailableException;
+use App\Exceptions\Service\Allocation\PortOutOfRangeException;
+use App\Exceptions\Service\Allocation\TooManyPortsInRangeException;
+use App\Models\Allocation;
+use App\Models\Server;
 use Webmozart\Assert\Assert;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Allocation;
-use Pterodactyl\Exceptions\Service\Allocation\AutoAllocationNotEnabledException;
-use Pterodactyl\Exceptions\Service\Allocation\NoAutoAllocationSpaceAvailableException;
 
 class FindAssignableAllocationService
 {
     /**
      * FindAssignableAllocationService constructor.
      */
-    public function __construct(private AssignmentService $service)
-    {
-    }
+    public function __construct(private AssignmentService $service) {}
 
     /**
-     * Finds an existing unassigned allocation and attempts to assign it to the given server. If
-     * no allocation can be found, a new one will be created with a random port between the defined
-     * range from the configuration.
+     * Finds an existing unassigned allocation and attempts to assign it to the given server.
      *
-     * @throws \Pterodactyl\Exceptions\DisplayException
-     * @throws \Pterodactyl\Exceptions\Service\Allocation\CidrOutOfRangeException
-     * @throws \Pterodactyl\Exceptions\Service\Allocation\InvalidPortMappingException
-     * @throws \Pterodactyl\Exceptions\Service\Allocation\PortOutOfRangeException
-     * @throws \Pterodactyl\Exceptions\Service\Allocation\TooManyPortsInRangeException
+     * Always attempts to find an existing unassigned allocation first. If create_new is enabled
+     * and no unassigned allocation is available, creates a new one from the configured port range.
+     * If create_new is disabled, throws an exception when no unassigned allocations are available.
+     *
+     * @throws DisplayException
+     * @throws CidrOutOfRangeException
+     * @throws InvalidPortMappingException
+     * @throws PortOutOfRangeException
+     * @throws TooManyPortsInRangeException
      */
     public function handle(Server $server): Allocation
     {
-        if (!config('openpanel.client_features.allocations.enabled')) {
+        if (!config('panel.client_features.allocations.enabled')) {
             throw new AutoAllocationNotEnabledException();
         }
 
-        // Validate that the server has a valid primary allocation IP
-        if (!$server->allocation) {
-            throw new \Pterodactyl\Exceptions\DisplayException("Server has no primary allocation");
-        }
-        
-        $allocationIp = $server->allocation->ip;
-        
-        // If it's not a valid IP, try to resolve it as a hostname
-        if (!filter_var($allocationIp, FILTER_VALIDATE_IP)) {
-            $resolvedIp = gethostbyname($allocationIp);
-            
-            // If gethostbyname fails, it returns the original hostname
-            if ($resolvedIp === $allocationIp || !filter_var($resolvedIp, FILTER_VALIDATE_IP)) {
-                throw new \Pterodactyl\Exceptions\DisplayException(
-                    "Cannot resolve allocation IP/hostname '{$allocationIp}' to a valid IP address"
-                );
-            }
-            
-            // Use the resolved IP for allocation operations
-            $allocationIp = $resolvedIp;
-        }
+        $createNew = config('panel.client_features.allocations.create_new', true);
 
         // Attempt to find a given available allocation for a server. If one cannot be found
-        // we will fall back to attempting to create a new allocation that can be used for the
-        // server.
+        // and create_new is enabled, we will fall back to attempting to create a new allocation
+        // that can be used for the server.
+        $start = config('panel.client_features.allocations.range_start', null);
+        $end = config('panel.client_features.allocations.range_end', null);
+
+        Assert::integerish($start);
+        Assert::integerish($end);
+
+        //
+        // Note: We use withoutGlobalScopes() to bypass Filament's tenant scoping when called
+        // from the Server panel context, which would otherwise filter allocations to only
+        // those belonging to the current server (making it impossible to find unassigned ones)
         /** @var Allocation|null $allocation */
-        $allocation = $server->node->allocations()
-            ->where('ip', $allocationIp)
+        $allocation = Allocation::withoutGlobalScopes()
+            ->where('node_id', $server->node_id)
+            ->when($server->allocation, function ($query) use ($server) {
+                $query->where('ip', $server->allocation->ip);
+            })
+            ->whereBetween('port', [$start, $end])
             ->whereNull('server_id')
             ->inRandomOrder()
             ->first();
 
-        $allocation = $allocation ?? $this->createNewAllocation($server, $allocationIp);
+        // If create_new is disabled, only pick from existing allocations
+        if (!$createNew && !$allocation) {
+            throw new NoAutoAllocationSpaceAvailableException();
+        }
 
-        $allocation->skipValidation()->update(['server_id' => $server->id]);
+        // If create_new is enabled, create a new allocation if none available
+        $allocation ??= $this->createNewAllocation($server, $start, $end);
+
+        $allocation->update(['server_id' => $server->id]);
 
         return $allocation->refresh();
     }
@@ -78,28 +83,24 @@ class FindAssignableAllocationService
      * in the settings. If there are no matches in that range, or something is wrong with the
      * range information provided an exception will be raised.
      *
-     * @throws \Pterodactyl\Exceptions\DisplayException
-     * @throws \Pterodactyl\Exceptions\Service\Allocation\CidrOutOfRangeException
-     * @throws \Pterodactyl\Exceptions\Service\Allocation\InvalidPortMappingException
-     * @throws \Pterodactyl\Exceptions\Service\Allocation\PortOutOfRangeException
-     * @throws \Pterodactyl\Exceptions\Service\Allocation\TooManyPortsInRangeException
+     * @throws DisplayException
+     * @throws CidrOutOfRangeException
+     * @throws InvalidPortMappingException
+     * @throws PortOutOfRangeException
+     * @throws TooManyPortsInRangeException
      */
-    protected function createNewAllocation(Server $server, string $resolvedIp): Allocation
+    protected function createNewAllocation(Server $server, ?int $start, ?int $end): Allocation
     {
-        $start = config('openpanel.client_features.allocations.range_start', null);
-        $end = config('openpanel.client_features.allocations.range_end', null);
-
         if (!$start || !$end) {
             throw new NoAutoAllocationSpaceAvailableException();
         }
 
-        Assert::integerish($start);
-        Assert::integerish($end);
-
-        // Get all of the currently allocated ports for the node so that we can figure out
+        // Get all the currently allocated ports for the node so that we can figure out
         // which port might be available.
-        $ports = $server->node->allocations()
-            ->where('ip', $resolvedIp)
+        // Use withoutGlobalScopes() to bypass tenant filtering.
+        $ports = Allocation::withoutGlobalScopes()
+            ->where('node_id', $server->node_id)
+            ->where('ip', $server->allocation->ip)
             ->whereBetween('port', [$start, $end])
             ->pluck('port');
 
@@ -108,7 +109,7 @@ class FindAssignableAllocationService
         // array of ports to create a new allocation to assign to the server.
         $available = array_diff(range($start, $end), $ports->toArray());
 
-        // If we've already allocated all of the ports, just abort.
+        // If we've already allocated all the ports, just abort.
         if (empty($available)) {
             throw new NoAutoAllocationSpaceAvailableException();
         }
@@ -118,13 +119,14 @@ class FindAssignableAllocationService
         $port = $available[array_rand($available)];
 
         $this->service->handle($server->node, [
-            'allocation_ip' => $resolvedIp,
+            'allocation_ip' => $server->allocation->ip,
             'allocation_ports' => [$port],
         ]);
 
         /** @var Allocation $allocation */
-        $allocation = $server->node->allocations()
-            ->where('ip', $resolvedIp)
+        $allocation = Allocation::withoutGlobalScopes()
+            ->where('node_id', $server->node_id)
+            ->where('ip', $server->allocation->ip)
             ->where('port', $port)
             ->firstOrFail();
 

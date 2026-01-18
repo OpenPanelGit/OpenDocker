@@ -1,27 +1,29 @@
 <?php
 
-namespace Pterodactyl\Exceptions;
+namespace App\Exceptions;
 
 use Exception;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Collection;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Container\Container;
 use Illuminate\Database\Connection;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Foundation\Application;
-use Illuminate\Auth\AuthenticationException;
-use Illuminate\Session\TokenMismatchException;
-use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Symfony\Component\HttpKernel\Exception\HttpException;
-use Symfony\Component\Mailer\Exception\TransportException;
-use Pterodactyl\Exceptions\Repository\RecordNotFoundException;
+use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use PDOException;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\Mailer\Exception\TransportException;
+use Throwable;
 
 class Handler extends ExceptionHandler
 {
@@ -30,7 +32,7 @@ class Handler extends ExceptionHandler
      * resulting in some weird rule names. This string will be parsed out and
      * replaced with 'p_' in the response code.
      */
-    private const PTERODACTYL_RULE_STRING = 'pterodactyl\_rules\_';
+    private const PANEL_RULE_STRING = 'App\_rules\_';
 
     /**
      * A list of the exception types that should not be reported.
@@ -40,7 +42,6 @@ class Handler extends ExceptionHandler
         AuthorizationException::class,
         HttpException::class,
         ModelNotFoundException::class,
-        RecordNotFoundException::class,
         TokenMismatchException::class,
         ValidationException::class,
     ];
@@ -48,6 +49,8 @@ class Handler extends ExceptionHandler
     /**
      * Maps exceptions to a specific response code. This handles special exception
      * types that don't have a defined response code.
+     *
+     * @var array<class-string, int>
      */
     protected static array $exceptionResponseCodes = [
         AuthenticationException::class => 401,
@@ -79,7 +82,7 @@ class Handler extends ExceptionHandler
             $this->dontReport = [];
         }
 
-        $this->reportable(function (\PDOException $ex) {
+        $this->reportable(function (PDOException $ex) {
             $ex = $this->generateCleanedExceptionStack($ex);
         });
 
@@ -88,7 +91,7 @@ class Handler extends ExceptionHandler
         });
     }
 
-    private function generateCleanedExceptionStack(\Throwable $exception): string
+    private function generateCleanedExceptionStack(Throwable $exception): string
     {
         $cleanedStack = '';
         foreach ($exception->getTrace() as $index => $item) {
@@ -117,11 +120,11 @@ class Handler extends ExceptionHandler
     /**
      * Render an exception into an HTTP response.
      *
-     * @param \Illuminate\Http\Request $request
+     * @param  Request  $request
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
-    public function render($request, \Throwable $e): Response
+    public function render($request, Throwable $e): Response
     {
         $connections = $this->container->make(Connection::class);
 
@@ -132,8 +135,6 @@ class Handler extends ExceptionHandler
         // This is kind of a hack, and ideally things like this should be handled as
         // much as possible at the code level, but there are a lot of spots that do a
         // ton of actions and were written before this bug discovery was made.
-        //
-        // @see https://github.com/pterodactyl/panel/pull/1468
         if ($connections->transactionLevel()) {
             $connections->rollBack(0);
         }
@@ -145,7 +146,7 @@ class Handler extends ExceptionHandler
      * Transform a validation exception into a consistent format to be returned for
      * calls to the API.
      *
-     * @param \Illuminate\Http\Request $request
+     * @param  Request  $request
      */
     public function invalidJson($request, ValidationException $exception): JsonResponse
     {
@@ -163,7 +164,7 @@ class Handler extends ExceptionHandler
             foreach ($errors as $key => $error) {
                 $meta = [
                     'source_field' => $field,
-                    'rule' => str_replace(self::PTERODACTYL_RULE_STRING, 'p_', Arr::get(
+                    'rule' => str_replace(self::PANEL_RULE_STRING, 'p_', Arr::get(
                         $codes,
                         str_replace('.', '_', $field) . '.' . $key
                     )),
@@ -185,9 +186,16 @@ class Handler extends ExceptionHandler
     }
 
     /**
-     * Return the exception as a JSONAPI representation for use on API requests.
+     * @param  array<string, mixed>  $override
+     * @return array{errors: array{
+     *     code: string,
+     *     status: string,
+     *     detail: string,
+     *     source?: array{line: int, file: string},
+     *     meta?: array{trace: string[], previous: string[]}
+     * }}|array{errors: array{non-empty-array<string, mixed>}}
      */
-    protected function convertExceptionToArray(\Throwable $e, array $override = []): array
+    public static function exceptionToArray(Throwable $e, array $override = []): array
     {
         $match = self::$exceptionResponseCodes[get_class($e)] ?? null;
 
@@ -219,8 +227,8 @@ class Handler extends ExceptionHandler
                     'trace' => Collection::make($e->getTrace())
                         ->map(fn ($trace) => Arr::except($trace, ['args']))
                         ->all(),
-                    'previous' => Collection::make($this->extractPrevious($e))
-                        ->map(fn ($exception) => $e->getTrace())
+                    'previous' => Collection::make(self::extractPrevious($e))
+                        ->map(fn ($exception) => $exception->getTrace())
                         ->map(fn ($trace) => Arr::except($trace, ['args']))
                         ->all(),
                 ],
@@ -231,17 +239,28 @@ class Handler extends ExceptionHandler
     }
 
     /**
+     * Return the exception as a JSONAPI representation for use on API requests.
+     *
+     * @param  array{detail?: mixed, source?: mixed, meta?: mixed}  $override
+     * @return array{errors?: array<mixed>}
+     */
+    protected function convertExceptionToArray(Throwable $e, array $override = []): array
+    {
+        return self::exceptionToArray($e, $override);
+    }
+
+    /**
      * Return an array of exceptions that should not be reported.
      */
-    public static function isReportable(\Exception $exception): bool
+    public static function isReportable(Exception $exception): bool
     {
-        return (new static(Container::getInstance()))->shouldReport($exception);
+        return (new self(Container::getInstance()))->shouldReport($exception);
     }
 
     /**
      * Convert an authentication exception into an unauthenticated response.
      *
-     * @param \Illuminate\Http\Request $request
+     * @param  Request  $request
      */
     protected function unauthenticated($request, AuthenticationException $exception): JsonResponse|RedirectResponse
     {
@@ -249,22 +268,19 @@ class Handler extends ExceptionHandler
             return new JsonResponse($this->convertExceptionToArray($exception), JsonResponse::HTTP_UNAUTHORIZED);
         }
 
-        return redirect()->guest('/auth/login');
+        return redirect()->guest(route('filament.app.auth.login'));
     }
 
     /**
      * Extracts all the previous exceptions that lead to the one passed into this
      * function being thrown.
      *
-     * @return \Throwable[]
+     * @return Throwable[]
      */
-    protected function extractPrevious(\Throwable $e): array
+    public static function extractPrevious(Throwable $e): array
     {
         $previous = [];
         while ($value = $e->getPrevious()) {
-            if (!$value instanceof \Throwable) {
-                break;
-            }
             $previous[] = $value;
             $e = $value;
         }
@@ -275,9 +291,11 @@ class Handler extends ExceptionHandler
     /**
      * Helper method to allow reaching into the handler to convert an exception
      * into the expected array response type.
+     *
+     * @return array<mixed>
      */
-    public static function toArray(\Throwable $e): array
+    public static function toArray(Throwable $e): array
     {
-        return (new self(app()))->convertExceptionToArray($e);
+        return self::exceptionToArray($e);
     }
 }

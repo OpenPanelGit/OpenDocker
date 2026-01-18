@@ -1,32 +1,37 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-class AddForeignNodes extends Migration
+return new class extends Migration
 {
-  /**
-   * Run the migrations.
-   */
-  public function up(): void
-  {
-    Schema::table('nodes', function (Blueprint $table) {
-      $table->integer('location', false, true)->nullable(false)->change();
-      $table->foreign('location')->references('id')->on('locations');
-    });
-  }
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('nodes', function (Blueprint $table) {
+            $table->unsignedInteger('location')->change();
+        });
 
-  /**
-   * Reverse the migrations.
-   */
-  public function down(): void
-  {
-    Schema::table('nodes', function (Blueprint $table) {
-      $table->dropForeign(['location']);
-      $table->dropIndex(['location']);
+        Schema::table('nodes', function (Blueprint $table) {
+            $table->foreign('location')->references('id')->on('locations');
+        });
+    }
 
-      $table->mediumInteger('location', false, true)->nullable(false)->change();
-    });
-  }
-}
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('nodes', function (Blueprint $table) {
+            $table->dropForeign('nodes_location_foreign');
+            $table->dropIndex('nodes_location_foreign');
+        });
+
+        Schema::table('nodes', function (Blueprint $table) {
+            $table->unsignedMediumInteger('location')->change();
+        });
+    }
+};

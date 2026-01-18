@@ -1,18 +1,19 @@
 <?php
 
-namespace Pterodactyl\Services\Databases;
+namespace App\Services\Databases;
 
+use App\Exceptions\Repository\DuplicateDatabaseNameException;
+use App\Exceptions\Service\Database\DatabaseClientFeatureNotEnabledException;
+use App\Exceptions\Service\Database\TooManyDatabasesException;
+use App\Facades\Activity;
+use App\Helpers\Utilities;
+use App\Models\Database;
+use App\Models\Server;
 use Exception;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Database;
-use Pterodactyl\Helpers\Utilities;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Contracts\Encryption\Encrypter;
-use Pterodactyl\Extensions\DynamicDatabaseConnection;
-use Pterodactyl\Repositories\Eloquent\DatabaseRepository;
-use Pterodactyl\Exceptions\Repository\DuplicateDatabaseNameException;
-use Pterodactyl\Exceptions\Service\Database\TooManyDatabasesException;
-use Pterodactyl\Exceptions\Service\Database\DatabaseClientFeatureNotEnabledException;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Throwable;
 
 class DatabaseManagementService
 {
@@ -20,7 +21,7 @@ class DatabaseManagementService
      * The regex used to validate that the database name passed through to the function is
      * in the expected format.
      *
-     * @see \Pterodactyl\Services\Databases\DatabaseManagementService::generateUniqueDatabaseName()
+     * @see \App\Services\Databases\DatabaseManagementService::generateUniqueDatabaseName()
      */
     private const MATCH_NAME_REGEX = '/^(s[\d]+_)(.*)$/';
 
@@ -34,9 +35,6 @@ class DatabaseManagementService
 
     public function __construct(
         protected ConnectionInterface $connection,
-        protected DynamicDatabaseConnection $dynamic,
-        protected Encrypter $encrypter,
-        protected DatabaseRepository $repository,
     ) {}
 
     /**
@@ -64,91 +62,97 @@ class DatabaseManagementService
     /**
      * Create a new database that is linked to a specific host.
      *
-     * @throws \Throwable
+     * @param  array{database?: string, database_host_id: int}  $data
+     *
+     * @throws Throwable
      * @throws TooManyDatabasesException
      * @throws DatabaseClientFeatureNotEnabledException
      */
     public function create(Server $server, array $data): Database
     {
-        if (!config('openpanel.client_features.databases.enabled')) {
+        if (!config('panel.client_features.databases.enabled')) {
             throw new DatabaseClientFeatureNotEnabledException();
         }
 
         if ($this->validateDatabaseLimit) {
-            if (!$server->allowsDatabases()) {
-                throw new TooManyDatabasesException();
-            }
-
             // If the server has a limit assigned and we've already reached that limit, throw back
             // an exception and kill the process.
-            if ($server->hasDatabaseLimit() && $server->databases()->count() >= $server->database_limit) {
+            if (!is_null($server->database_limit) && $server->databases()->count() >= $server->database_limit) {
                 throw new TooManyDatabasesException();
             }
         }
 
         // Protect against developer mistakes...
         if (empty($data['database']) || !preg_match(self::MATCH_NAME_REGEX, $data['database'])) {
-            throw new \InvalidArgumentException('The database name passed to DatabaseManagementService::handle MUST be prefixed with "s{server_id}_".');
+            throw new InvalidArgumentException('The database name passed to DatabaseManagementService::handle MUST be prefixed with "s{server_id}_".');
         }
 
         $data = array_merge($data, [
             'server_id' => $server->id,
-            'username' => sprintf('u%d_%s', $server->id, str_random(10)),
-            'password' => $this->encrypter->encrypt(
-                Utilities::randomStringWithSpecialCharacters(24)
-            ),
+            'username' => sprintf('u%d_%s', $server->id, Str::random(10)),
+            'password' => Utilities::randomStringWithSpecialCharacters(24),
         ]);
 
-        $database = null;
+        return $this->connection->transaction(function () use ($data) {
+            $database = $this->createModel($data);
 
-        try {
-            return $this->connection->transaction(function () use ($data, &$database) {
-                $database = $this->createModel($data);
+            $database
+                ->createDatabase()
+                ->createUser()
+                ->assignUserToDatabase()
+                ->flushPrivileges();
 
-                $this->dynamic->set('dynamic', $data['database_host_id']);
+            Activity::event('server:database.create')
+                ->subject($database)
+                ->property('name', $database->database)
+                ->log();
 
-                $this->repository->createDatabase($database->database);
-                $this->repository->createUser(
-                    $database->username,
-                    $database->remote,
-                    $this->encrypter->decrypt($database->password),
-                    $database->max_connections
-                );
-                $this->repository->assignUserToDatabase($database->database, $database->username, $database->remote);
-                $this->repository->flush();
-
-                return $database;
-            });
-        } catch (\Exception $exception) {
-            try {
-                if ($database instanceof Database) {
-                    $this->repository->dropDatabase($database->database);
-                    $this->repository->dropUser($database->username, $database->remote);
-                    $this->repository->flush();
-                }
-            } catch (\Exception $deletionException) {
-                // Do nothing here. We've already encountered an issue before this point so no
-                // reason to prioritize this error over the initial one.
-            }
-
-            throw $exception;
-        }
+            return $database;
+        });
     }
 
     /**
      * Delete a database from the given host server.
      *
-     * @throws \Exception
+     * @throws Throwable
      */
     public function delete(Database $database): ?bool
     {
-        $this->dynamic->set('dynamic', $database->database_host_id);
+        return $this->connection->transaction(function () use ($database) {
+            $database
+                ->dropDatabase()
+                ->dropUser()
+                ->flushPrivileges();
 
-        $this->repository->dropDatabase($database->database);
-        $this->repository->dropUser($database->username, $database->remote);
-        $this->repository->flush();
+            Activity::event('server:database.delete')
+                ->subject($database)
+                ->property('name', $database->database)
+                ->log();
 
-        return $database->delete();
+            return $database->delete();
+        });
+    }
+
+    /**
+     * Updates a password for a given database.
+     *
+     * @throws \Exception
+     */
+    public function rotatePassword(Database $database): void
+    {
+        $password = Utilities::randomStringWithSpecialCharacters(24);
+
+        $this->connection->transaction(function () use ($database, $password) {
+            $database->update([
+                'password' => $password,
+            ]);
+
+            $database
+                ->dropUser()
+                ->createUser()
+                ->assignUserToDatabase()
+                ->flushPrivileges();
+        });
     }
 
     /**
@@ -156,8 +160,10 @@ class DatabaseManagementService
      * have the same name across multiple hosts, for the sake of keeping this logic easy to understand
      * and avoiding user confusion we will ignore the specific host and just look across all hosts.
      *
+     * @param  array{server_id: int, database: string}  $data
+     *
      * @throws DuplicateDatabaseNameException
-     * @throws \Throwable
+     * @throws Throwable
      */
     protected function createModel(array $data): Database
     {

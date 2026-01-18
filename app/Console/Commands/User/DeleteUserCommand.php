@@ -1,11 +1,10 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\User;
+namespace App\Console\Commands\User;
 
-use Pterodactyl\Models\User;
-use Webmozart\Assert\Assert;
+use App\Models\User;
 use Illuminate\Console\Command;
-use Pterodactyl\Services\Users\UserDeletionService;
+use Webmozart\Assert\Assert;
 
 class DeleteUserCommand extends Command
 {
@@ -13,18 +12,10 @@ class DeleteUserCommand extends Command
 
     protected $signature = 'p:user:delete {--user=}';
 
-    /**
-     * DeleteUserCommand constructor.
-     */
-    public function __construct(private UserDeletionService $deletionService)
-    {
-        parent::__construct();
-    }
-
     public function handle(): int
     {
         $search = $this->option('user') ?? $this->ask(trans('command/messages.user.search_users'));
-        Assert::notEmpty($search, 'Search term should be an email address, got: %s.');
+        Assert::notEmpty($search, 'Search term should not be empty.');
 
         $results = User::query()
             ->where('id', 'LIKE', "$search%")
@@ -44,13 +35,15 @@ class DeleteUserCommand extends Command
         if ($this->input->isInteractive()) {
             $tableValues = [];
             foreach ($results as $user) {
-                $tableValues[] = [$user->id, $user->email, $user->name];
+                $tableValues[] = [$user->id, $user->email, $user->username];
             }
 
             $this->table(['User ID', 'Email', 'Name'], $tableValues);
             if (!$deleteUser = $this->ask(trans('command/messages.user.select_search_user'))) {
                 return $this->handle();
             }
+
+            $deleteUser = User::query()->findOrFail($deleteUser);
         } else {
             if (count($results) > 1) {
                 $this->error(trans('command/messages.user.multiple_found'));
@@ -62,7 +55,8 @@ class DeleteUserCommand extends Command
         }
 
         if ($this->confirm(trans('command/messages.user.confirm_delete')) || !$this->input->isInteractive()) {
-            $this->deletionService->handle($deleteUser);
+            $deleteUser->delete();
+
             $this->info(trans('command/messages.user.deleted'));
         }
 

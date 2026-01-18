@@ -1,23 +1,22 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Account;
+namespace App\Http\Requests\Api\Client\Account;
 
-use phpseclib3\Crypt\DSA;
-use phpseclib3\Crypt\RSA;
-use Pterodactyl\Models\UserSSHKey;
+use App\Http\Requests\Api\Client\ClientApiRequest;
+use App\Models\UserSSHKey;
+use Exception;
 use Illuminate\Validation\Validator;
-use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Crypt\Common\PublicKey;
+use phpseclib3\Crypt\DSA;
+use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Crypt\RSA;
 use phpseclib3\Exception\NoKeyLoadedException;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
 
 class StoreSSHKeyRequest extends ClientApiRequest
 {
     protected ?PublicKey $key;
 
-    /**
-     * Returns the rules for this request.
-     */
+    /** @return array<string, string|string[]> */
     public function rules(): array
     {
         return [
@@ -70,7 +69,7 @@ class StoreSSHKeyRequest extends ClientApiRequest
     public function getKeyFingerprint(): string
     {
         if (!$this->key) {
-            throw new \Exception('The public key was not properly loaded for this request.');
+            throw new Exception('The public key was not properly loaded for this request.');
         }
 
         return $this->key->getFingerprint('sha256');

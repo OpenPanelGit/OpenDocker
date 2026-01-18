@@ -1,61 +1,53 @@
 <?php
 
-namespace Pterodactyl\Services\Servers;
+namespace App\Services\Servers;
 
-use Webmozart\Assert\Assert;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Repositories\Wings\DaemonServerRepository;
+use App\Enums\ServerState;
+use App\Enums\SuspendAction;
+use App\Models\Server;
+use App\Repositories\Daemon\DaemonServerRepository;
+use Filament\Notifications\Notification;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Throwable;
 
 class SuspensionService
 {
-    public const ACTION_SUSPEND = 'suspend';
-    public const ACTION_UNSUSPEND = 'unsuspend';
-
     /**
      * SuspensionService constructor.
      */
     public function __construct(
-        private DaemonServerRepository $daemonServerRepository,
-    ) {
-    }
+        private DaemonServerRepository $daemonServerRepository
+    ) {}
 
     /**
      * Suspends a server on the system.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
-    public function toggle(Server $server, string $action = self::ACTION_SUSPEND): void
+    public function handle(Server $server, SuspendAction $action): void
     {
-        Assert::oneOf($action, [self::ACTION_SUSPEND, self::ACTION_UNSUSPEND]);
-
-        $isSuspending = $action === self::ACTION_SUSPEND;
+        $isSuspending = $action === SuspendAction::Suspend;
         // Nothing needs to happen if we're suspending the server, and it is already
         // suspended in the database. Additionally, nothing needs to happen if the server
         // is not suspended, and we try to un-suspend the instance.
         if ($isSuspending === $server->isSuspended()) {
+            Notification::make()->danger()->title(trans('notifications.failed'))->body(trans('admin/server.notifications.server_already_suspended'))->send();
+
             return;
         }
 
         // Check if the server is currently being transferred.
         if (!is_null($server->transfer)) {
+            Notification::make()->danger()->title(trans('notifications.failed'))->body(trans('admin/server.notifications.already_transfering'))->send();
             throw new ConflictHttpException('Cannot toggle suspension status on a server that is currently being transferred.');
         }
 
         // Update the server's suspension status.
         $server->update([
-            'status' => $isSuspending ? Server::STATUS_SUSPENDED : null,
+            'status' => $isSuspending ? ServerState::Suspended : null,
         ]);
 
-        try {
-            // Tell wings to re-sync the server state.
-            $this->daemonServerRepository->setServer($server)->sync();
-        } catch (\Exception $exception) {
-            // Rollback the server's suspension status if wings fails to sync the server.
-            $server->update([
-                'status' => $isSuspending ? null : Server::STATUS_SUSPENDED,
-            ]);
-            throw $exception;
-        }
+        // Tell daemon to re-sync the server state.
+        $this->daemonServerRepository->setServer($server)->sync();
     }
 }

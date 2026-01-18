@@ -1,17 +1,18 @@
 <?php
 
-namespace Pterodactyl\Exceptions\Service\Backup;
+namespace App\Exceptions\Service\Backup;
 
-use Pterodactyl\Exceptions\DisplayException;
+use App\Exceptions\DisplayException;
 
 class TooManyBackupsException extends DisplayException
 {
     /**
      * TooManyBackupsException constructor.
      */
-    public function __construct(int $backupLimit, ?string $customMessage = null)
+    public function __construct(int $backupLimit)
     {
-        $message = $customMessage ?? sprintf('Cannot create a new backup, this server has reached its limit of %d backups.', $backupLimit);
-        parent::__construct($message);
+        parent::__construct(
+            sprintf('Cannot create a new backup, this server has reached its limit of %d backups.', $backupLimit)
+        );
     }
 }

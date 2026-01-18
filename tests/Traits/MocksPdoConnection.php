@@ -1,13 +1,13 @@
 <?php
 
-namespace Pterodactyl\Tests\Traits;
+namespace App\Tests\Traits;
 
-use PDO;
-use Mockery;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\MySqlConnection;
 use Illuminate\Database\ConnectionResolver;
 use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\MySqlConnection;
+use Mockery;
+use PDO;
 
 trait MocksPdoConnection
 {

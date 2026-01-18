@@ -1,13 +1,14 @@
 <?php
 
-namespace Pterodactyl\Services\Servers;
+namespace App\Services\Servers;
 
-use Illuminate\Support\Arr;
-use Pterodactyl\Models\Server;
+use App\Models\Server;
+use App\Repositories\Daemon\DaemonServerRepository;
+use App\Traits\Services\ReturnsUpdatedModels;
 use Illuminate\Database\ConnectionInterface;
-use Pterodactyl\Traits\Services\ReturnsUpdatedModels;
-use Pterodactyl\Repositories\Wings\DaemonServerRepository;
-use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Arr;
+use Throwable;
 
 class DetailsModificationService
 {
@@ -16,14 +17,19 @@ class DetailsModificationService
     /**
      * DetailsModificationService constructor.
      */
-    public function __construct(private ConnectionInterface $connection, private DaemonServerRepository $serverRepository)
-    {
-    }
+    public function __construct(private ConnectionInterface $connection, private DaemonServerRepository $serverRepository) {}
 
     /**
      * Update the details for a single server instance.
      *
-     * @throws \Throwable
+     * @param array{
+     *     external_id: int,
+     *     owner_id: int,
+     *     name: string,
+     *     description?: ?string
+     * } $data
+     *
+     * @throws Throwable
      */
     public function handle(Server $server, array $data): Server
     {
@@ -38,13 +44,13 @@ class DetailsModificationService
             ])->saveOrFail();
 
             // If the owner_id value is changed we need to revoke any tokens that exist for the server
-            // on the Wings instance so that the old owner no longer has any permission to access the
+            // on the daemon instance so that the old owner no longer has any permission to access the
             // websockets.
             if ($server->owner_id !== $owner) {
                 try {
-                    $this->serverRepository->setServer($server)->revokeUserJTI($owner);
-                } catch (DaemonConnectionException $exception) {
-                    // Do nothing. A failure here is not ideal, but it is likely to be caused by Wings
+                    $this->serverRepository->setServer($server)->deauthorize($server->user->uuid);
+                } catch (ConnectionException) {
+                    // Do nothing. A failure here is not ideal, but it is likely to be caused by daemon
                     // being offline, or in an entirely broken state. Remember, these tokens reset every
                     // few minutes by default, we're just trying to help it along a little quicker.
                 }

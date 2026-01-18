@@ -1,9 +1,12 @@
 <?php
 
-namespace Pterodactyl\Models;
+namespace App\Models;
 
-use Illuminate\Validation\Rules\NotIn;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Contracts\Validatable;
+use App\Traits\HasValidation;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 /**
  * @property int $id
@@ -14,12 +17,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $target
  * @property bool $read_only
  * @property bool $user_mountable
- * @property \Pterodactyl\Models\Egg[]|\Illuminate\Database\Eloquent\Collection $eggs
- * @property \Pterodactyl\Models\Node[]|\Illuminate\Database\Eloquent\Collection $nodes
- * @property \Pterodactyl\Models\Server[]|\Illuminate\Database\Eloquent\Collection $servers
+ * @property Egg[]|Collection $eggs
+ * @property Node[]|Collection $nodes
+ * @property Server[]|Collection $servers
  */
-class Mount extends Model
+class Mount extends Model implements Validatable
 {
+    use HasValidation { getRules as getValidationRules; }
+
     /**
      * The resource name for this model when it is transformed into an
      * API representation using fractal.
@@ -27,46 +32,36 @@ class Mount extends Model
     public const RESOURCE_NAME = 'mount';
 
     /**
-     * The table associated with the model.
-     */
-    protected $table = 'mounts';
-
-    /**
      * Fields that are not mass assignable.
+     *
+     * @var string[]
      */
-    protected $guarded = ['id', 'uuid'];
-
-    /**
-     * Default values for specific fields in the database.
-     */
-    protected $casts = [
-        'id' => 'int',
-        'read_only' => 'bool',
-        'user_mountable' => 'bool',
-    ];
+    protected $guarded = ['id'];
 
     /**
      * Rules verifying that the data being stored matches the expectations of the database.
+     *
+     * @var array<array-key, string[]>
      */
     public static array $validationRules = [
-        'name' => 'required|string|min:2|max:64|unique:mounts,name',
-        'description' => 'nullable|string|max:191',
-        'source' => 'required|string',
-        'target' => 'required|string',
-        'read_only' => 'sometimes|boolean',
-        'user_mountable' => 'sometimes|boolean',
+        'name' => ['required', 'string', 'min:2', 'max:64', 'unique:mounts,name'],
+        'description' => ['nullable', 'string', 'max:255'],
+        'source' => ['required', 'string'],
+        'target' => ['required', 'string'],
+        'read_only' => ['sometimes', 'boolean'],
+        'user_mountable' => ['sometimes', 'boolean'],
     ];
 
     /**
-     * Implement language verification by overriding Eloquence's gather
-     * rules function.
+     * Implement language verification by overriding Eloquence's gather rules function.
+     *
+     * @return array<array-key, string[]>
      */
     public static function getRules(): array
     {
-        $rules = parent::getRules();
-
-        $rules['source'][] = new NotIn(Mount::$invalidSourcePaths);
-        $rules['target'][] = new NotIn(Mount::$invalidTargetPaths);
+        $rules = self::getValidationRules();
+        $rules['source'][] = 'not_in:' . implode(',', Mount::$invalidSourcePaths);
+        $rules['target'][] = 'not_in:' . implode(',', Mount::$invalidTargetPaths);
 
         return $rules;
     }
@@ -78,41 +73,54 @@ class Mount extends Model
 
     /**
      * Blacklisted source paths.
+     *
+     * @var string[]
      */
-    public static $invalidSourcePaths = [
-        '/etc/elytra',
-        '/var/lib/elytra/volumes',
+    public static array $invalidSourcePaths = [
+        '/etc/pelican',
+        '/var/lib/pelican/volumes',
         '/srv/daemon-data',
     ];
 
     /**
      * Blacklisted target paths.
+     *
+     * @var string[]
      */
-    public static $invalidTargetPaths = [
+    public static array $invalidTargetPaths = [
         '/home/container',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'id' => 'int',
+            'read_only' => 'bool',
+            'user_mountable' => 'bool',
+        ];
+    }
 
     /**
      * Returns all eggs that have this mount assigned.
      */
-    public function eggs(): BelongsToMany
+    public function eggs(): MorphToMany
     {
-        return $this->belongsToMany(Egg::class);
+        return $this->morphedByMany(Egg::class, 'mountable');
     }
 
     /**
      * Returns all nodes that have this mount assigned.
      */
-    public function nodes(): BelongsToMany
+    public function nodes(): MorphToMany
     {
-        return $this->belongsToMany(Node::class);
+        return $this->morphedByMany(Node::class, 'mountable');
     }
 
     /**
      * Returns all servers that have this mount assigned.
      */
-    public function servers(): BelongsToMany
+    public function servers(): MorphToMany
     {
-        return $this->belongsToMany(Server::class);
+        return $this->morphedByMany(Server::class, 'mountable');
     }
 }

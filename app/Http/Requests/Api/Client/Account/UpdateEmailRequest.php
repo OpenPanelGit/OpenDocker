@@ -1,12 +1,12 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Account;
+namespace App\Http\Requests\Api\Client\Account;
 
-use Pterodactyl\Models\User;
+use App\Exceptions\Http\Base\InvalidPasswordProvidedException;
+use App\Http\Requests\Api\Client\ClientApiRequest;
+use App\Models\User;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Hashing\Hasher;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
-use Pterodactyl\Exceptions\Http\Base\InvalidPasswordProvidedException;
 
 class UpdateEmailRequest extends ClientApiRequest
 {
@@ -26,7 +26,7 @@ class UpdateEmailRequest extends ClientApiRequest
             throw new InvalidPasswordProvidedException(trans('validation.internal.invalid_password'));
         }
 
-        return true;
+        return !$this->user()->is_managed_externally;
     }
 
     public function rules(): array

@@ -1,9 +1,7 @@
 <?php
 
-namespace Pterodactyl\Exceptions\Service\Egg\Variable;
+namespace App\Exceptions\Service\Egg\Variable;
 
-use Pterodactyl\Exceptions\DisplayException;
+use App\Exceptions\DisplayException;
 
-class BadValidationRuleException extends DisplayException
-{
-}
+class BadValidationRuleException extends DisplayException {}

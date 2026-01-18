@@ -1,14 +1,14 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Servers;
+namespace App\Http\Requests\Api\Application\Servers;
 
-use Pterodactyl\Models\Server;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Pterodactyl\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Models\Server;
+use App\Services\Acl\Api\AdminAcl;
 
 class UpdateServerStartupRequest extends ApplicationApiRequest
 {
-    protected ?string $resource = AdminAcl::RESOURCE_SERVERS;
+    protected ?string $resource = Server::RESOURCE_NAME;
 
     protected int $permission = AdminAcl::WRITE;
 
@@ -17,19 +17,21 @@ class UpdateServerStartupRequest extends ApplicationApiRequest
      */
     public function rules(): array
     {
-        $data = Server::getRulesForUpdate($this->parameter('server', Server::class));
+        $rules = $this->route() ? Server::getRulesForUpdate($this->parameter('server', Server::class)) : Server::getRules();
 
         return [
-            'startup' => $data['startup'],
+            'startup' => 'sometimes|string',
             'environment' => 'present|array',
-            'egg' => $data['egg_id'],
-            'image' => $data['image'],
+            'egg' => $rules['egg_id'],
+            'image' => 'sometimes|string',
             'skip_scripts' => 'present|boolean',
         ];
     }
 
     /**
      * Return the validated data in a format that is expected by the service.
+     *
+     * @return array<string, mixed>
      */
     public function validated($key = null, $default = null): array
     {

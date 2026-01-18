@@ -1,14 +1,15 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\Subuser;
+namespace App\Tests\Integration\Api\Client\Server\Subuser;
 
-use Illuminate\Support\Str;
-use Pterodactyl\Models\User;
-use Illuminate\Http\Response;
-use Pterodactyl\Models\Subuser;
-use Pterodactyl\Models\Permission;
+use App\Enums\SubuserPermission;
+use App\Models\Subuser;
+use App\Models\User;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Illuminate\Foundation\Testing\WithFaker;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use Illuminate\Http\Response;
+use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class CreateServerSubuserTest extends ClientApiIntegrationTestCase
 {
@@ -17,28 +18,28 @@ class CreateServerSubuserTest extends ClientApiIntegrationTestCase
     /**
      * Test that a subuser can be created for a server.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('permissionsDataProvider')]
-    public function testSubuserCanBeCreated(array $permissions)
+    #[DataProvider('permissionsDataProvider')]
+    public function test_subuser_can_be_created(array $permissions): void
     {
         [$user, $server] = $this->generateTestAccount($permissions);
 
         $response = $this->actingAs($user)->postJson($this->link($server) . '/users', [
-            'email' => $email = $this->faker->email,
+            'email' => $email = $this->faker->email(),
             'permissions' => [
-                Permission::ACTION_USER_CREATE,
+                SubuserPermission::UserCreate->value,
             ],
         ]);
 
         $response->assertOk();
 
-        /** @var User $subuser */
+        /** @var \App\Models\User $subuser */
         $subuser = User::query()->where('email', $email)->firstOrFail();
 
         $response->assertJsonPath('object', Subuser::RESOURCE_NAME);
         $response->assertJsonPath('attributes.uuid', $subuser->uuid);
         $response->assertJsonPath('attributes.permissions', [
-            Permission::ACTION_USER_CREATE,
-            Permission::ACTION_WEBSOCKET_CONNECT,
+            SubuserPermission::UserCreate->value,
+            SubuserPermission::WebsocketConnect->value,
         ]);
 
         $expected = $response->json('attributes');
@@ -51,19 +52,19 @@ class CreateServerSubuserTest extends ClientApiIntegrationTestCase
      * Tests that an error is returned if a subuser attempts to create a new subuser and assign
      * permissions that their account does not also possess.
      */
-    public function testErrorIsReturnedIfAssigningPermissionsNotAssignedToSelf()
+    public function test_error_is_returned_if_assigning_permissions_not_assigned_to_self(): void
     {
         [$user, $server] = $this->generateTestAccount([
-            Permission::ACTION_USER_CREATE,
-            Permission::ACTION_USER_READ,
-            Permission::ACTION_CONTROL_CONSOLE,
+            SubuserPermission::UserCreate,
+            SubuserPermission::UserRead,
+            SubuserPermission::ControlConsole,
         ]);
 
         $response = $this->actingAs($user)->postJson($this->link($server) . '/users', [
-            'email' => $this->faker->email,
+            'email' => $this->faker->email(),
             'permissions' => [
-                Permission::ACTION_USER_CREATE,
-                Permission::ACTION_USER_UPDATE, // This permission is not assigned to the subuser.
+                SubuserPermission::UserCreate->value,
+                SubuserPermission::UserUpdate->value, // This permission is not assigned to the subuser.
             ],
         ]);
 
@@ -75,16 +76,16 @@ class CreateServerSubuserTest extends ClientApiIntegrationTestCase
     /**
      * Throws some bad data at the API and ensures that a subuser cannot be created.
      */
-    public function testSubuserWithExcessivelyLongEmailCannotBeCreated()
+    public function test_subuser_with_excessively_long_email_cannot_be_created(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
-        $email = str_repeat(Str::random(20), 9) . '1@gmail.com'; // 191 is the hard limit for the column in MySQL.
+        $email = str_repeat(Str::random(35), 7) . '@gmail.com'; // 255 is the hard limit for the column in MySQL.
 
         $response = $this->actingAs($user)->postJson($this->link($server) . '/users', [
             'email' => $email,
             'permissions' => [
-                Permission::ACTION_USER_CREATE,
+                SubuserPermission::UserCreate->value,
             ],
         ]);
 
@@ -93,12 +94,12 @@ class CreateServerSubuserTest extends ClientApiIntegrationTestCase
         $response = $this->actingAs($user)->postJson($this->link($server) . '/users', [
             'email' => $email . '.au',
             'permissions' => [
-                Permission::ACTION_USER_CREATE,
+                SubuserPermission::UserCreate->value,
             ],
         ]);
 
         $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
-        $response->assertJsonPath('errors.0.detail', 'The email must be between 1 and 191 characters.');
+        $response->assertJsonPath('errors.0.detail', 'The email must be between 1 and 255 characters.');
         $response->assertJsonPath('errors.0.meta.source_field', 'email');
     }
 
@@ -106,17 +107,17 @@ class CreateServerSubuserTest extends ClientApiIntegrationTestCase
      * Test that creating a subuser when there is already an account with that email runs
      * as expected and does not create a new account.
      */
-    public function testCreatingSubuserWithSameEmailAsExistingUserWorks()
+    public function test_creating_subuser_with_same_email_as_existing_user_works(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
-        /** @var User $existing */
-        $existing = User::factory()->create(['email' => $this->faker->email]);
+        /** @var \App\Models\User $existing */
+        $existing = User::factory()->create(['email' => $this->faker->email()]);
 
         $response = $this->actingAs($user)->postJson($this->link($server) . '/users', [
             'email' => $existing->email,
             'permissions' => [
-                Permission::ACTION_USER_CREATE,
+                SubuserPermission::UserCreate->value,
             ],
         ]);
 
@@ -129,14 +130,14 @@ class CreateServerSubuserTest extends ClientApiIntegrationTestCase
      * Test that an error is returned if the account associated with an email address is already
      * associated with the server instance.
      */
-    public function testAddingSubuserThatAlreadyIsAssignedReturnsError()
+    public function test_adding_subuser_that_already_is_assigned_returns_error(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
         $response = $this->actingAs($user)->postJson($this->link($server) . '/users', [
-            'email' => $email = $this->faker->email,
+            'email' => $email = $this->faker->email(),
             'permissions' => [
-                Permission::ACTION_USER_CREATE,
+                SubuserPermission::UserCreate->value,
             ],
         ]);
 
@@ -145,7 +146,7 @@ class CreateServerSubuserTest extends ClientApiIntegrationTestCase
         $response = $this->actingAs($user)->postJson($this->link($server) . '/users', [
             'email' => $email,
             'permissions' => [
-                Permission::ACTION_USER_CREATE,
+                SubuserPermission::UserCreate->value,
             ],
         ]);
 
@@ -156,6 +157,6 @@ class CreateServerSubuserTest extends ClientApiIntegrationTestCase
 
     public static function permissionsDataProvider(): array
     {
-        return [[[]], [[Permission::ACTION_USER_CREATE]]];
+        return [[[]], [[SubuserPermission::UserCreate]]];
     }
 }

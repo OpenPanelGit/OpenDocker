@@ -1,18 +1,18 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Files;
+namespace App\Http\Requests\Api\Client\Servers\Files;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
 
 class CompressFilesRequest extends ClientApiRequest
 {
     /**
      * Checks that the authenticated user is allowed to create archives for this server.
      */
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_FILE_ARCHIVE;
+        return SubuserPermission::FileArchive;
     }
 
     public function rules(): array
@@ -21,6 +21,8 @@ class CompressFilesRequest extends ClientApiRequest
             'root' => 'sometimes|nullable|string',
             'files' => 'required|array',
             'files.*' => 'string',
+            'name' => 'sometimes|nullable|string',
+            'extension' => 'sometimes|in:zip,tgz,tar.gz,txz,tar.xz,tbz2,tar.bz2',
         ];
     }
 }

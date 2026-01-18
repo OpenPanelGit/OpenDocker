@@ -1,32 +1,37 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-class AddForeignServiceOptions extends Migration
+return new class extends Migration
 {
-  /**
-   * Run the migrations.
-   */
-  public function up(): void
-  {
-    Schema::table('service_options', function (Blueprint $table) {
-      $table->integer('parent_service', false, true)->change();
-      $table->foreign('parent_service')->references('id')->on('services');
-    });
-  }
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('service_options', function (Blueprint $table) {
+            $table->unsignedInteger('parent_service')->change();
+        });
 
-  /**
-   * Reverse the migrations.
-   */
-  public function down(): void
-  {
-    Schema::table('service_options', function (Blueprint $table) {
-      $table->dropForeign(['parent_service']);
-      $table->dropIndex(['parent_service']);
+        Schema::table('service_options', function (Blueprint $table) {
+            $table->foreign('parent_service')->references('id')->on('services');
+        });
+    }
 
-      $table->mediumInteger('parent_service', false, true)->change();
-    });
-  }
-}
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('service_options', function (Blueprint $table) {
+            $table->dropForeign('service_options_parent_service_foreign');
+            $table->dropIndex('service_options_parent_service_foreign');
+        });
+
+        Schema::table('service_options', function (Blueprint $table) {
+            $table->unsignedMediumInteger('parent_service')->change();
+        });
+    }
+};

@@ -1,13 +1,12 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\Schedule;
+namespace App\Console\Commands\Schedule;
 
-use Exception;
+use App\Models\Schedule;
+use App\Services\Schedules\ProcessScheduleService;
 use Illuminate\Console\Command;
-use Pterodactyl\Models\Schedule;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Builder;
-use Pterodactyl\Services\Schedules\ProcessScheduleService;
+use Throwable;
 
 class ProcessRunnableCommand extends Command
 {
@@ -15,23 +14,18 @@ class ProcessRunnableCommand extends Command
 
     protected $description = 'Process schedules in the database and determine which are ready to run.';
 
-    /**
-     * Handle command execution.
-     */
-    public function handle(): int
+    public function handle(ProcessScheduleService $processScheduleService): int
     {
-        $this->cleanupStuckSchedules();
-
         $schedules = Schedule::query()
             ->with('tasks')
             ->whereRelation('server', fn (Builder $builder) => $builder->whereNull('status'))
             ->where('is_active', true)
             ->where('is_processing', false)
-            ->whereRaw('next_run_at <= NOW()')
+            ->where('next_run_at', '<=', now('UTC')->toDateTimeString())
             ->get();
 
         if ($schedules->count() < 1) {
-            $this->line('There are no scheduled tasks for servers that need to be run.');
+            $this->line(trans('commands.schedule.process.no_tasks'));
 
             return 0;
         }
@@ -39,7 +33,7 @@ class ProcessRunnableCommand extends Command
         $bar = $this->output->createProgressBar(count($schedules));
         foreach ($schedules as $schedule) {
             $bar->clear();
-            $this->processSchedule($schedule);
+            $this->processSchedule($processScheduleService, $schedule);
             $bar->advance();
             $bar->display();
         }
@@ -53,54 +47,24 @@ class ProcessRunnableCommand extends Command
      * Processes a given schedule and logs and errors encountered the console output. This should
      * never throw an exception out, otherwise you'll end up killing the entire run group causing
      * any other schedules to not process correctly.
-     *
-     * @see https://github.com/pterodactyl/panel/issues/2609
      */
-    protected function processSchedule(Schedule $schedule)
+    protected function processSchedule(ProcessScheduleService $processScheduleService, Schedule $schedule): void
     {
         if ($schedule->tasks->isEmpty()) {
             return;
         }
 
         try {
-            $this->getLaravel()->make(ProcessScheduleService::class)->handle($schedule);
+            $processScheduleService->handle($schedule);
 
             $this->line(trans('command/messages.schedule.output_line', [
                 'schedule' => $schedule->name,
-                'hash' => $schedule->hashid,
+                'id' => $schedule->id,
             ]));
-        } catch (\Throwable|\Exception $exception) {
-            Log::error($exception, ['schedule_id' => $schedule->id]);
+        } catch (Throwable $exception) {
+            logger()->error($exception, ['schedule_id' => $schedule->id]);
 
-            $this->error("An error was encountered while processing Schedule #$schedule->id: " . $exception->getMessage());
-        }
-    }
-
-    protected function cleanupStuckSchedules(): void
-    {
-        $timeout = 600;
-
-        $stuck = Schedule::query()
-            ->where('is_processing', true)
-            ->where('updated_at', '<', now()->subSeconds($timeout))
-            ->get();
-
-        if ($stuck->count() > 0) {
-            $this->warn("Found {$stuck->count()} stuck schedule(s), resetting...");
-
-            foreach ($stuck as $schedule) {
-                $schedule->update(['is_processing' => false]);
-                $schedule->tasks()->update([
-                    'is_queued' => false,
-                    'is_processing' => false,
-                ]);
-
-                Log::warning('Reset stuck schedule', [
-                    'schedule_id' => $schedule->id,
-                    'schedule_name' => $schedule->name,
-                    'last_updated' => $schedule->updated_at,
-                ]);
-            }
+            $this->error(trans('commands.schedule.process.error_message', ['schedules' => " #$schedule->id: " . $exception->getMessage()]));
         }
     }
 }

@@ -1,20 +1,20 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Subusers;
+namespace App\Http\Requests\Api\Client\Servers\Subusers;
 
-use Pterodactyl\Models\Permission;
+use App\Enums\SubuserPermission;
 
 class StoreSubuserRequest extends SubuserRequest
 {
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_USER_CREATE;
+        return SubuserPermission::UserCreate;
     }
 
     public function rules(): array
     {
         return [
-            'email' => 'required|email|between:1,191',
+            'email' => 'required|email|between:1,255',
             'permissions' => 'required|array',
             'permissions.*' => 'string',
         ];

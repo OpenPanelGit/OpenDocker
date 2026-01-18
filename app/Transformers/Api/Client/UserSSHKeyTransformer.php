@@ -1,8 +1,8 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Client;
+namespace App\Transformers\Api\Client;
 
-use Pterodactyl\Models\UserSSHKey;
+use App\Models\UserSSHKey;
 
 class UserSSHKeyTransformer extends BaseClientTransformer
 {
@@ -12,9 +12,9 @@ class UserSSHKeyTransformer extends BaseClientTransformer
     }
 
     /**
-     * Return's a user's SSH key in an API response format.
+     * @param  UserSSHKey  $model
      */
-    public function transform(UserSSHKey $model): array
+    public function transform($model): array
     {
         return [
             'name' => $model->name,

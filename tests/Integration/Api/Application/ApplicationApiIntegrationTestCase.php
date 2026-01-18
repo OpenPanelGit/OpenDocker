@@ -1,23 +1,29 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Application;
+namespace App\Tests\Integration\Api\Application;
 
+use App\Models\Allocation;
+use App\Models\ApiKey;
+use App\Models\Database;
+use App\Models\DatabaseHost;
+use App\Models\Egg;
+use App\Models\Mount;
+use App\Models\Node;
+use App\Models\Role;
+use App\Models\Server;
+use App\Models\User;
+use App\Services\Acl\Api\AdminAcl;
+use App\Tests\Integration\IntegrationTestCase;
+use App\Tests\Traits\Http\IntegrationJsonRequestAssertions;
+use App\Tests\Traits\Integration\CreatesTestModels;
+use App\Transformers\Api\Application\BaseTransformer;
+use App\Transformers\Api\Client\BaseClientTransformer;
 use Illuminate\Http\Request;
-use Pterodactyl\Models\User;
 use PHPUnit\Framework\Assert;
-use Pterodactyl\Models\ApiKey;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Pterodactyl\Tests\Traits\Integration\CreatesTestModels;
-use Pterodactyl\Transformers\Api\Application\BaseTransformer;
-use Pterodactyl\Transformers\Api\Client\BaseClientTransformer;
-use Pterodactyl\Tests\Traits\Http\IntegrationJsonRequestAssertions;
 
 abstract class ApplicationApiIntegrationTestCase extends IntegrationTestCase
 {
     use CreatesTestModels;
-    use DatabaseTransactions;
     use IntegrationJsonRequestAssertions;
 
     private ApiKey $key;
@@ -28,7 +34,7 @@ abstract class ApplicationApiIntegrationTestCase extends IntegrationTestCase
      * Bootstrap application API tests. Creates a default admin user and associated API key
      * and also sets some default headers required for accessing the API.
      */
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -36,8 +42,8 @@ abstract class ApplicationApiIntegrationTestCase extends IntegrationTestCase
         $this->key = $this->createApiKey($this->user);
 
         $this
-            ->withHeader('Accept', 'application/vnd.pterodactyl.v1+json')
-            ->withHeader('Authorization', 'Bearer ' . $this->key->identifier . decrypt($this->key->token));
+            ->withHeader('Accept', 'application/vnd.panel.v1+json')
+            ->withHeader('Authorization', 'Bearer ' . $this->key->identifier . $this->key->token);
     }
 
     public function getApiUser(): User
@@ -57,7 +63,7 @@ abstract class ApplicationApiIntegrationTestCase extends IntegrationTestCase
     {
         $this->key = $this->createApiKey($user, $permissions);
 
-        $this->withHeader('Authorization', 'Bearer ' . $this->key->identifier . decrypt($this->key->token));
+        $this->withHeader('Authorization', 'Bearer ' . $this->key->identifier . $this->key->token);
 
         return $this->key;
     }
@@ -67,9 +73,10 @@ abstract class ApplicationApiIntegrationTestCase extends IntegrationTestCase
      */
     protected function createApiUser(): User
     {
-        return User::factory()->create([
-            'root_admin' => true,
-        ]);
+        $user = User::factory()->create();
+        $user->syncRoles(Role::getRootAdmin());
+
+        return $user;
     }
 
     /**
@@ -77,19 +84,21 @@ abstract class ApplicationApiIntegrationTestCase extends IntegrationTestCase
      */
     protected function createApiKey(User $user, array $permissions = []): ApiKey
     {
-        return ApiKey::factory()->create(array_merge([
+        return ApiKey::factory()->create([
             'user_id' => $user->id,
             'key_type' => ApiKey::TYPE_APPLICATION,
-            'r_servers' => AdminAcl::READ | AdminAcl::WRITE,
-            'r_nodes' => AdminAcl::READ | AdminAcl::WRITE,
-            'r_allocations' => AdminAcl::READ | AdminAcl::WRITE,
-            'r_users' => AdminAcl::READ | AdminAcl::WRITE,
-            'r_locations' => AdminAcl::READ | AdminAcl::WRITE,
-            'r_nests' => AdminAcl::READ | AdminAcl::WRITE,
-            'r_eggs' => AdminAcl::READ | AdminAcl::WRITE,
-            'r_database_hosts' => AdminAcl::READ | AdminAcl::WRITE,
-            'r_server_databases' => AdminAcl::READ | AdminAcl::WRITE,
-        ], $permissions));
+            'permissions' => array_merge([
+                Server::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+                Node::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+                Allocation::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+                User::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+                Egg::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+                DatabaseHost::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+                Database::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+                Mount::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+                Role::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+            ], $permissions),
+        ]);
     }
 
     /**

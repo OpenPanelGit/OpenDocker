@@ -1,15 +1,16 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Services\Databases;
+namespace App\Tests\Integration\Services\Databases;
 
+use App\Exceptions\Service\Database\NoSuitableDatabaseHostException;
+use App\Models\Database;
+use App\Models\DatabaseHost;
+use App\Models\Node;
+use App\Services\Databases\DatabaseManagementService;
+use App\Services\Databases\DeployServerDatabaseService;
+use App\Tests\Integration\IntegrationTestCase;
 use Mockery\MockInterface;
-use Pterodactyl\Models\Node;
-use Pterodactyl\Models\Database;
-use Pterodactyl\Models\DatabaseHost;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
-use Pterodactyl\Services\Databases\DatabaseManagementService;
-use Pterodactyl\Services\Databases\DeployServerDatabaseService;
-use Pterodactyl\Exceptions\Service\Database\NoSuitableDatabaseHostException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class DeployServerDatabaseServiceTest extends IntegrationTestCase
 {
@@ -18,7 +19,7 @@ class DeployServerDatabaseServiceTest extends IntegrationTestCase
     /**
      * Setup tests.
      */
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -31,7 +32,7 @@ class DeployServerDatabaseServiceTest extends IntegrationTestCase
      */
     protected function tearDown(): void
     {
-        config()->set('pterodactyl.client_features.databases.allow_random', true);
+        config()->set('panel.client_features.databases.allow_random', true);
 
         Database::query()->delete();
         DatabaseHost::query()->delete();
@@ -42,8 +43,8 @@ class DeployServerDatabaseServiceTest extends IntegrationTestCase
     /**
      * Test that an error is thrown if either the database name or the remote host are empty.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('invalidDataProvider')]
-    public function testErrorIsThrownIfDatabaseNameIsEmpty(array $data)
+    #[DataProvider('invalidDataProvider')]
+    public function test_error_is_thrown_if_database_name_is_empty(array $data): void
     {
         $server = $this->createServerModel();
 
@@ -56,14 +57,14 @@ class DeployServerDatabaseServiceTest extends IntegrationTestCase
      * Test that an error is thrown if there are no database hosts on the same node as the
      * server and the allow_random config value is false.
      */
-    public function testErrorIsThrownIfNoDatabaseHostsExistOnNode()
+    public function test_error_is_thrown_if_no_database_hosts_exist_on_node(): void
     {
         $server = $this->createServerModel();
 
-        $node = Node::factory()->create(['location_id' => $server->location->id]);
-        DatabaseHost::factory()->create(['node_id' => $node->id]);
+        $node = Node::factory()->create();
+        DatabaseHost::factory()->recycle($node)->create();
 
-        config()->set('pterodactyl.client_features.databases.allow_random', false);
+        config()->set('panel.client_features.databases.allow_random', false);
 
         $this->expectException(NoSuitableDatabaseHostException::class);
 
@@ -76,7 +77,7 @@ class DeployServerDatabaseServiceTest extends IntegrationTestCase
     /**
      * Test that an error is thrown if no database hosts exist at all on the system.
      */
-    public function testErrorIsThrownIfNoDatabaseHostsExistOnSystem()
+    public function test_error_is_thrown_if_no_database_hosts_exist_on_system(): void
     {
         $server = $this->createServerModel();
 
@@ -91,13 +92,10 @@ class DeployServerDatabaseServiceTest extends IntegrationTestCase
     /**
      * Test that a database host on the same node as the server is preferred.
      */
-    public function testDatabaseHostOnSameNodeIsPreferred()
+    public function test_database_host_on_same_node_is_preferred(): void
     {
         $server = $this->createServerModel();
-
-        $node = Node::factory()->create(['location_id' => $server->location->id]);
-        DatabaseHost::factory()->create(['node_id' => $node->id]);
-        $host = DatabaseHost::factory()->create(['node_id' => $server->node_id]);
+        $host = DatabaseHost::factory()->recycle($server->node)->create();
 
         $this->managementService->expects('create')->with($server, [
             'database_host_id' => $host->id,
@@ -118,12 +116,12 @@ class DeployServerDatabaseServiceTest extends IntegrationTestCase
      * there are no same-node hosts and the allow_random configuration value is set to
      * true.
      */
-    public function testDatabaseHostIsSelectedIfNoSuitableHostExistsOnSameNode()
+    public function test_database_host_is_selected_if_no_suitable_host_exists_on_same_node(): void
     {
         $server = $this->createServerModel();
 
-        $node = Node::factory()->create(['location_id' => $server->location->id]);
-        $host = DatabaseHost::factory()->create(['node_id' => $node->id]);
+        $node = Node::factory()->create();
+        $host = DatabaseHost::factory()->recycle($node)->create();
 
         $this->managementService->expects('create')->with($server, [
             'database_host_id' => $host->id,

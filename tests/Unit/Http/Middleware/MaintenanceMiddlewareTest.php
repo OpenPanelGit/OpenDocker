@@ -1,14 +1,14 @@
 <?php
 
-namespace Pterodactyl\Tests\Unit\Http\Middleware;
+namespace App\Tests\Unit\Http\Middleware;
 
+use App\Http\Middleware\MaintenanceMiddleware;
+use App\Models\Node;
+use App\Models\Server;
+use Illuminate\Contracts\Routing\ResponseFactory;
+use Illuminate\Http\Response;
 use Mockery as m;
 use Mockery\MockInterface;
-use Pterodactyl\Models\Node;
-use Illuminate\Http\Response;
-use Pterodactyl\Models\Server;
-use Illuminate\Contracts\Routing\ResponseFactory;
-use Pterodactyl\Http\Middleware\MaintenanceMiddleware;
 
 class MaintenanceMiddlewareTest extends MiddlewareTestCase
 {
@@ -17,7 +17,7 @@ class MaintenanceMiddlewareTest extends MiddlewareTestCase
     /**
      * Setup tests.
      */
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -27,12 +27,16 @@ class MaintenanceMiddlewareTest extends MiddlewareTestCase
     /**
      * Test that a node not in maintenance mode continues through the request cycle.
      */
-    public function testHandle()
+    public function test_handle(): void
     {
-        $server = Server::factory()->make();
-        $node = Node::factory()->make(['maintenance' => 0]);
+        // maintenance mode is off by default
+        $server = new Server();
 
+        $node = new Node([
+            'maintenance_mode' => false,
+        ]);
         $server->setRelation('node', $node);
+
         $this->setRequestAttribute('server', $server);
 
         $this->getMiddleware()->handle($this->request, $this->getClosureAssertions());
@@ -41,12 +45,15 @@ class MaintenanceMiddlewareTest extends MiddlewareTestCase
     /**
      * Test that a node in maintenance mode returns an error view.
      */
-    public function testHandleInMaintenanceMode()
+    public function test_handle_in_maintenance_mode(): void
     {
-        $server = Server::factory()->make();
-        $node = Node::factory()->make(['maintenance_mode' => 1]);
+        $server = new Server();
 
+        $node = new Node([
+            'maintenance_mode' => true,
+        ]);
         $server->setRelation('node', $node);
+
         $this->setRequestAttribute('server', $server);
 
         $this->response->shouldReceive('view')

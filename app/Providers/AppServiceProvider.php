@@ -1,98 +1,135 @@
 <?php
 
-namespace Pterodactyl\Providers;
+namespace App\Providers;
 
-use Pterodactyl\Models;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\URL;
-use Illuminate\Pagination\Paginator;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\ServiceProvider;
-use Pterodactyl\Extensions\Themes\Theme;
+use App\Checks\CacheCheck;
+use App\Checks\DatabaseCheck;
+use App\Checks\DebugModeCheck;
+use App\Checks\EnvironmentCheck;
+use App\Checks\NodeVersionsCheck;
+use App\Checks\PanelVersionCheck;
+use App\Checks\ScheduleCheck;
+use App\Checks\UsedDiskSpaceCheck;
+use App\Models\Allocation;
+use App\Models\ApiKey;
+use App\Models\Backup;
+use App\Models\Database;
+use App\Models\Egg;
+use App\Models\EggVariable;
+use App\Models\Node;
+use App\Models\Schedule;
+use App\Models\Server;
+use App\Models\Task;
+use App\Models\User;
+use App\Models\UserSSHKey;
+use App\Services\Helpers\PluginService;
+use App\Services\Helpers\SoftwareVersionService;
+use Dedoc\Scramble\Scramble;
+use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\SecurityScheme;
+use Illuminate\Config\Repository;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Console\AboutCommand;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Health\Facades\Health;
 
 class AppServiceProvider extends ServiceProvider
 {
-  /**
-   * Bootstrap any application services.
-   */
-  public function boot(): void
-  {
-    Schema::defaultStringLength(191);
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(
+        Application $app,
+        SoftwareVersionService $versionService,
+        Repository $config,
+    ): void {
+        // If the APP_URL value is set with https:// make sure we force it here. Theoretically
+        // this should just work with the proxy logic, but there are a lot of cases where it
+        // doesn't, and it triggers a lot of support requests, so lets just head it off here.
+        URL::forceHttps(Str::startsWith(config('app.url') ?? '', 'https://'));
 
-    View::share('appVersion', $this->versionData()['version'] ?? 'undefined');
-    View::share('appIsGit', $this->versionData()['is_git'] ?? false);
-
-    Paginator::useBootstrap();
-
-    // If the APP_URL value is set with https:// make sure we force it here. Theoretically
-    // this should just work with the proxy logic, but there are a lot of cases where it
-    // doesn't, and it triggers a lot of support requests, so lets just head it off here.
-    //
-    // @see https://github.com/pterodactyl/panel/issues/3623
-    if (Str::startsWith(config('app.url') ?? '', 'https://')) {
-      URL::forceScheme('https');
-    }
-
-    Relation::enforceMorphMap([
-      'allocation' => Models\Allocation::class,
-      'api_key' => Models\ApiKey::class,
-      'backup' => Models\Backup::class,
-      'database' => Models\Database::class,
-      'egg' => Models\Egg::class,
-      'egg_variable' => Models\EggVariable::class,
-      'schedule' => Models\Schedule::class,
-      'server' => Models\Server::class,
-      'ssh_key' => Models\UserSSHKey::class,
-      'task' => Models\Task::class,
-      'user' => Models\User::class,
-    ]);
-  }
-
-  /**
-   * Register application service providers.
-   */
-  public function register(): void
-  {
-    // Only load the settings service provider if the environment
-    // is configured to allow it.
-    if (!config('openpanel.load_environment_only', false) && $this->app->environment() !== 'testing') {
-      $this->app->register(SettingsServiceProvider::class);
-    }
-
-    $this->app->singleton('extensions.themes', function () {
-      return new Theme();
-    });
-
-  }
-
-  /**
-   * Return version information for the footer.
-   */
-  protected function versionData(): array
-  {
-    return Cache::remember('git-version', 5, function () {
-      if (file_exists(base_path('.git/HEAD'))) {
-        $head = explode(' ', file_get_contents(base_path('.git/HEAD')));
-
-        if (array_key_exists(1, $head)) {
-          $path = base_path('.git/' . trim($head[1]));
+        if ($app->runningInConsole() && empty(config('app.key'))) {
+            $config->set('app.key', '');
         }
-      }
 
-      if (isset($path) && file_exists($path)) {
-        return [
-          'version' => substr(file_get_contents($path), 0, 8),
-          'is_git' => true,
-        ];
-      }
+        Relation::enforceMorphMap([
+            'allocation' => Allocation::class,
+            'api_key' => ApiKey::class,
+            'backup' => Backup::class,
+            'database' => Database::class,
+            'egg' => Egg::class,
+            'egg_variable' => EggVariable::class,
+            'schedule' => Schedule::class,
+            'server' => Server::class,
+            'ssh_key' => UserSSHKey::class,
+            'task' => Task::class,
+            'user' => User::class,
+            'node' => Node::class,
+        ]);
 
-      return [
-        'version' => config('app.version'),
-        'is_git' => false,
-      ];
-    });
-  }
+        Http::macro(
+            'daemon',
+            fn (Node $node, array $headers = []) => Http::acceptJson()
+                ->asJson()
+                ->withToken($node->daemon_token)
+                ->withHeaders($headers)
+                ->withOptions(['verify' => (bool) $app->environment('production')])
+                ->timeout(config('panel.guzzle.timeout'))
+                ->connectTimeout(config('panel.guzzle.connect_timeout'))
+                ->baseUrl($node->getConnectionAddress())
+        );
+
+        Sanctum::usePersonalAccessTokenModel(ApiKey::class);
+
+        Gate::define('viewApiDocs', fn () => true);
+
+        $bearerTokens = fn (OpenApi $openApi) => $openApi->secure(SecurityScheme::http('bearer'));
+        Scramble::registerApi('application', ['api_path' => 'api/application', 'info' => ['version' => '1.0']])->afterOpenApiGenerated($bearerTokens);
+        Scramble::registerApi('client', ['api_path' => 'api/client', 'info' => ['version' => '1.0']])->afterOpenApiGenerated($bearerTokens);
+
+        // Don't run any health checks during tests
+        if (!$app->runningUnitTests()) {
+            Health::checks([
+                DebugModeCheck::new()->if($app->isProduction()),
+                EnvironmentCheck::new(),
+                CacheCheck::new(),
+                DatabaseCheck::new(),
+                ScheduleCheck::new(),
+                UsedDiskSpaceCheck::new(),
+                PanelVersionCheck::new(),
+                NodeVersionsCheck::new(),
+            ]);
+        }
+
+        Gate::before(fn (User $user, $ability) => $user->isRootAdmin() ? true : null);
+
+        AboutCommand::add('Pelican', [
+            'Panel Version' => $versionService->currentPanelVersion(),
+            'Latest Version' => $versionService->latestPanelVersion(),
+            'Up-to-Date' => $versionService->isLatestPanel() ? '<fg=green;options=bold>Yes</>' : '<fg=red;options=bold>No</>',
+        ]);
+
+        AboutCommand::add('Drivers', 'Backups', config('backups.default'));
+
+        AboutCommand::add('Environment', 'Installation Directory', base_path());
+    }
+
+    /**
+     * Register application service providers.
+     */
+    public function register(): void
+    {
+        Scramble::ignoreDefaultRoutes();
+
+        /** @var PluginService $pluginService */
+        $pluginService = app(PluginService::class); // @phpstan-ignore myCustomRules.forbiddenGlobalFunctions
+
+        $pluginService->loadPlugins();
+    }
 }

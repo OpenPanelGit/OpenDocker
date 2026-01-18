@@ -1,15 +1,15 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Databases;
+namespace App\Http\Requests\Api\Client\Servers\Databases;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Contracts\Http\ClientPermissionsRequest;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use App\Contracts\Http\ClientPermissionsRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
 
 class DeleteDatabaseRequest extends ClientApiRequest implements ClientPermissionsRequest
 {
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_DATABASE_DELETE;
+        return SubuserPermission::DatabaseDelete;
     }
 }

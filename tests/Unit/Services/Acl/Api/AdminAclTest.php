@@ -1,18 +1,20 @@
 <?php
 
-namespace Pterodactyl\Tests\Unit\Services\Acl\Api;
+namespace App\Tests\Unit\Services\Acl\Api;
 
-use Pterodactyl\Models\ApiKey;
-use Pterodactyl\Tests\TestCase;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
+use App\Models\ApiKey;
+use App\Models\Server;
+use App\Services\Acl\Api\AdminAcl;
+use App\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class AdminAclTest extends TestCase
 {
     /**
      * Test that permissions return the expects values.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('permissionsDataProvider')]
-    public function testPermissions(int $permission, int $check, bool $outcome)
+    #[DataProvider('permissionsDataProvider')]
+    public function test_permissions(int $permission, int $check, bool $outcome): void
     {
         $this->assertSame($outcome, AdminAcl::can($permission, $check));
     }
@@ -20,11 +22,13 @@ class AdminAclTest extends TestCase
     /**
      * Test that checking against a model works as expected.
      */
-    public function testCheck()
+    public function test_check(): void
     {
-        $model = ApiKey::factory()->make(['r_servers' => AdminAcl::READ | AdminAcl::WRITE]);
+        $model = ApiKey::factory()->make(['permissions' => [
+            Server::RESOURCE_NAME => AdminAcl::READ | AdminAcl::WRITE,
+        ]]);
 
-        $this->assertTrue(AdminAcl::check($model, AdminAcl::RESOURCE_SERVERS, AdminAcl::WRITE));
+        $this->assertTrue(AdminAcl::check($model, Server::RESOURCE_NAME, AdminAcl::WRITE));
     }
 
     /**

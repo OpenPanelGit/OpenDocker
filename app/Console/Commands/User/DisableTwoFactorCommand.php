@@ -1,9 +1,10 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\User;
+namespace App\Console\Commands\User;
 
+use App\Exceptions\Model\DataValidationException;
+use App\Models\User;
 use Illuminate\Console\Command;
-use Pterodactyl\Contracts\Repository\UserRepositoryInterface;
 
 class DisableTwoFactorCommand extends Command
 {
@@ -12,32 +13,25 @@ class DisableTwoFactorCommand extends Command
     protected $signature = 'p:user:disable2fa {--email= : The email of the user to disable 2-Factor for.}';
 
     /**
-     * DisableTwoFactorCommand constructor.
-     */
-    public function __construct(private UserRepositoryInterface $repository)
-    {
-        parent::__construct();
-    }
-
-    /**
      * Handle command execution process.
      *
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
+     * @throws DataValidationException
      */
-    public function handle()
+    public function handle(): void
     {
         if ($this->input->isInteractive()) {
             $this->output->warning(trans('command/messages.user.2fa_help_text'));
         }
 
         $email = $this->option('email') ?? $this->ask(trans('command/messages.user.ask_email'));
-        $user = $this->repository->setColumns(['id', 'email'])->findFirstWhere([['email', '=', $email]]);
 
-        $this->repository->withoutFreshModel()->update($user->id, [
-            'use_totp' => false,
-            'totp_secret' => null,
+        $user = User::where('email', $email)->firstOrFail();
+        $user->update([
+            'mfa_app_secret' => null,
+            'mfa_app_recovery_codes' => null,
+            'mfa_email_enabled' => false,
         ]);
+
         $this->info(trans('command/messages.user.2fa_disabled', ['email' => $user->email]));
     }
 }

@@ -1,10 +1,11 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\Maintenance;
+namespace App\Console\Commands\Maintenance;
 
+use App\Models\Backup;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
-use Pterodactyl\Models\Backup;
+use InvalidArgumentException;
 
 class PruneOrphanedBackupsCommand extends Command
 {
@@ -12,19 +13,11 @@ class PruneOrphanedBackupsCommand extends Command
 
     protected $description = 'Marks all backups older than "n" minutes that have not yet completed as being failed.';
 
-    /**
-     * PruneOrphanedBackupsCommand constructor.
-     */
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
-    public function handle()
+    public function handle(): void
     {
         $since = $this->option('prune-age') ?? config('backups.prune_age', 360);
         if (!$since || !is_digit($since)) {
-            throw new \InvalidArgumentException('The "--prune-age" argument must be a value greater than 0.');
+            throw new InvalidArgumentException('The "--prune-age" argument must be a value greater than 0.');
         }
 
         $query = Backup::query()

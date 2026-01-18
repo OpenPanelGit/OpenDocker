@@ -1,10 +1,10 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Files;
+namespace App\Http\Requests\Api\Client\Servers\Files;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Contracts\Http\ClientPermissionsRequest;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use App\Contracts\Http\ClientPermissionsRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
 
 class WriteFileContentRequest extends ClientApiRequest implements ClientPermissionsRequest
 {
@@ -13,9 +13,9 @@ class WriteFileContentRequest extends ClientApiRequest implements ClientPermissi
      * validate that the authenticated user has permission to perform this action aganist
      * the given resource (server).
      */
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_FILE_CREATE;
+        return SubuserPermission::FileCreate;
     }
 
     /**

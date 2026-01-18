@@ -1,39 +1,35 @@
 <?php
 
-namespace Pterodactyl\Extensions\Backups;
+namespace App\Extensions\Backups;
 
-use Closure;
+use App\Extensions\Filesystem\S3Filesystem;
 use Aws\S3\S3Client;
+use Closure;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Webmozart\Assert\Assert;
-use Illuminate\Foundation\Application;
+use InvalidArgumentException;
 use League\Flysystem\FilesystemAdapter;
-use Pterodactyl\Extensions\Filesystem\S3Filesystem;
 use League\Flysystem\InMemory\InMemoryFilesystemAdapter;
-use Illuminate\Contracts\Config\Repository as ConfigRepository;
+use Webmozart\Assert\Assert;
 
 class BackupManager
 {
-    protected ConfigRepository $config;
-
     /**
      * The array of resolved backup drivers.
+     *
+     * @var array<string, FilesystemAdapter>
      */
     protected array $adapters = [];
 
     /**
      * The registered custom driver creators.
+     *
+     * @var array<string, callable>
      */
     protected array $customCreators;
 
-    /**
-     * BackupManager constructor.
-     */
-    public function __construct(protected Application $app)
-    {
-        $this->config = $app->make(ConfigRepository::class);
-    }
+    public function __construct(protected Application $app) {}
 
     /**
      * Returns a backup adapter instance.
@@ -69,7 +65,7 @@ class BackupManager
         $config = $this->getConfig($name);
 
         if (empty($config['adapter'])) {
-            throw new \InvalidArgumentException("Backup disk [$name] does not have a configured adapter.");
+            throw new InvalidArgumentException("Backup disk [$name] does not have a configured adapter.");
         }
 
         $adapter = $config['adapter'];
@@ -87,11 +83,13 @@ class BackupManager
             return $instance;
         }
 
-        throw new \InvalidArgumentException("Adapter [$adapter] is not supported.");
+        throw new InvalidArgumentException("Adapter [$adapter] is not supported.");
     }
 
     /**
      * Calls a custom creator for a given adapter type.
+     *
+     * @param  array{adapter: string}  $config
      */
     protected function callCustomCreator(array $config): mixed
     {
@@ -99,7 +97,9 @@ class BackupManager
     }
 
     /**
-     * Creates a new Wings adapter.
+     * Creates a new daemon adapter.
+     *
+     * @param  array<string, string>  $config
      */
     public function createWingsAdapter(array $config): FilesystemAdapter
     {
@@ -107,15 +107,9 @@ class BackupManager
     }
 
     /**
-     * Creates a new Elytra adapter.
-     */
-    public function createElytraAdapter(array $config): FilesystemAdapter
-    {
-        return new InMemoryFilesystemAdapter();
-    }
-
-    /**
      * Creates a new S3 adapter.
+     *
+     * @param  array<string, string>  $config
      */
     public function createS3Adapter(array $config): FilesystemAdapter
     {
@@ -131,31 +125,13 @@ class BackupManager
     }
 
     /**
-     * Creates a new Rustic Local adapter.
-     * Rustic adapters don't use traditional filesystem operations - they are handled by Wings directly.
-     */
-    public function createRusticLocalAdapter(array $config): FilesystemAdapter
-    {
-        // Return a minimal adapter since rustic operations are handled by Wings
-        return new InMemoryFilesystemAdapter();
-    }
-
-    /**
-     * Creates a new Rustic S3 adapter.
-     * Rustic adapters don't use traditional filesystem operations - they are handled by Wings directly.
-     */
-    public function createRusticS3Adapter(array $config): FilesystemAdapter
-    {
-        // Return a minimal adapter since rustic operations are handled by Wings
-        return new InMemoryFilesystemAdapter();
-    }
-
-    /**
      * Returns the configuration associated with a given backup type.
+     *
+     * @return array<mixed>
      */
     protected function getConfig(string $name): array
     {
-        return $this->config->get("backups.disks.$name") ?: [];
+        return config("backups.disks.$name") ?: [];
     }
 
     /**
@@ -163,7 +139,7 @@ class BackupManager
      */
     public function getDefaultAdapter(): string
     {
-        return $this->config->get('backups.default');
+        return config('backups.default');
     }
 
     /**
@@ -171,18 +147,19 @@ class BackupManager
      */
     public function setDefaultAdapter(string $name): void
     {
-        $this->config->set('backups.default', $name);
+        config()->set('backups.default', $name);
     }
 
     /**
      * Unset the given adapter instances.
      *
-     * @param string|string[] $adapter
+     * @param  string|string[]  $adapter
      */
     public function forget(array|string $adapter): self
     {
+        $adapters = &$this->adapters;
         foreach ((array) $adapter as $adapterName) {
-            unset($this->adapters[$adapterName]);
+            unset($adapters[$adapterName]);
         }
 
         return $this;
@@ -191,7 +168,7 @@ class BackupManager
     /**
      * Register a custom adapter creator closure.
      */
-    public function extend(string $adapter, \Closure $callback): self
+    public function extend(string $adapter, Closure $callback): self
     {
         $this->customCreators[$adapter] = $callback;
 

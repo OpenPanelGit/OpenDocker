@@ -1,15 +1,15 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Application;
+namespace App\Http\Controllers\Api\Application;
 
+use App\Extensions\Spatie\Fractalistic\Fractal;
+use App\Http\Controllers\Controller;
+use App\Transformers\Api\Application\BaseTransformer;
+use Illuminate\Container\Container;
 use Illuminate\Http\Request;
-use Webmozart\Assert\Assert;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
-use Illuminate\Container\Container;
-use Pterodactyl\Http\Controllers\Controller;
-use Pterodactyl\Extensions\Spatie\Fractalistic\Fractal;
-use Pterodactyl\Transformers\Api\Application\BaseTransformer;
+use Webmozart\Assert\Assert;
 
 abstract class ApplicationApiController extends Controller
 {
@@ -40,7 +40,7 @@ abstract class ApplicationApiController extends Controller
      * Perform dependency injection of certain classes needed for core functionality
      * without littering the constructors of classes that extend this abstract.
      */
-    public function loadDependencies(Fractal $fractal, Request $request)
+    public function loadDependencies(Fractal $fractal, Request $request): void
     {
         $this->fractal = $fractal;
         $this->request = $request;
@@ -49,10 +49,9 @@ abstract class ApplicationApiController extends Controller
     /**
      * Return an instance of an application transformer.
      *
-     * @template T of \Pterodactyl\Transformers\Api\Application\BaseTransformer
+     * @template T of \App\Transformers\Api\Application\BaseTransformer
      *
-     * @param class-string<T> $abstract
-     *
+     * @param  class-string<T>  $abstract
      * @return T
      *
      * @noinspection PhpDocSignatureInspection
@@ -70,5 +69,13 @@ abstract class ApplicationApiController extends Controller
     protected function returnNoContent(): Response
     {
         return new Response('', Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * Return an HTTP/406 response for the API.
+     */
+    protected function returnNotAcceptable(): Response
+    {
+        return new Response('', Response::HTTP_NOT_ACCEPTABLE);
     }
 }

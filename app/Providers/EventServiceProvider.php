@@ -1,16 +1,8 @@
 <?php
 
-namespace Pterodactyl\Providers;
+namespace App\Providers;
 
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Subuser;
-use Pterodactyl\Models\EggVariable;
-use Pterodactyl\Observers\UserObserver;
-use Pterodactyl\Observers\SubuserObserver;
-use Pterodactyl\Observers\EggVariableObserver;
-use Pterodactyl\Listeners\Auth\AuthenticationListener;
-use Pterodactyl\Events\Server\Installed as ServerInstalledEvent;
-use Pterodactyl\Notifications\ServerInstalled as ServerInstalledNotification;
+use App\Listeners\DispatchWebhooks;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -19,22 +11,9 @@ class EventServiceProvider extends ServiceProvider
      * The event to listener mappings for the application.
      */
     protected $listen = [
-        ServerInstalledEvent::class => [ServerInstalledNotification::class],
+        'App\\*' => [DispatchWebhooks::class],
+        'eloquent.created*' => [DispatchWebhooks::class],
+        'eloquent.deleted*' => [DispatchWebhooks::class],
+        'eloquent.updated*' => [DispatchWebhooks::class],
     ];
-
-    protected $subscribe = [
-        AuthenticationListener::class,
-    ];
-
-    /**
-     * Register any events for your application.
-     */
-    public function boot(): void
-    {
-        parent::boot();
-
-        User::observe(UserObserver::class);
-        Subuser::observe(SubuserObserver::class);
-        EggVariable::observe(EggVariableObserver::class);
-    }
 }

@@ -1,29 +1,33 @@
 <?php
 
-namespace Pterodactyl\Services\Nodes;
+namespace App\Services\Nodes;
 
+use App\Extensions\Lcobucci\JWT\Encoding\TimestampDates;
+use App\Models\Node;
+use App\Models\User;
 use Carbon\CarbonImmutable;
+use DateTimeImmutable;
 use Illuminate\Support\Str;
-use Pterodactyl\Models\Node;
-use Pterodactyl\Models\User;
-use Lcobucci\JWT\Token\Plain;
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Lcobucci\JWT\Signer\Key\InMemory;
-use Pterodactyl\Extensions\Lcobucci\JWT\Encoding\TimestampDates;
+use Lcobucci\JWT\UnencryptedToken;
 
 class NodeJWTService
 {
+    /** @var array<array-key, mixed> */
     private array $claims = [];
 
     private ?User $user = null;
 
-    private ?\DateTimeImmutable $expiresAt;
+    private DateTimeImmutable $expiresAt;
 
     private ?string $subject = null;
 
     /**
      * Set the claims to include in this JWT.
+     *
+     * @param  array<array-key, mixed>  $claims
      */
     public function setClaims(array $claims): self
     {
@@ -43,7 +47,7 @@ class NodeJWTService
         return $this;
     }
 
-    public function setExpiresAt(\DateTimeImmutable $date): self
+    public function setExpiresAt(DateTimeImmutable $date): self
     {
         $this->expiresAt = $date;
 
@@ -60,10 +64,10 @@ class NodeJWTService
     /**
      * Generate a new JWT for a given node.
      */
-    public function handle(Node $node, ?string $identifiedBy, string $algo = 'md5'): Plain
+    public function handle(Node $node, ?string $identifiedBy, string $algo = 'sha256'): UnencryptedToken
     {
         $identifier = hash($algo, $identifiedBy);
-        $config = Configuration::forSymmetricSigner(new Sha256(), InMemory::plainText($node->getDecryptedKey()));
+        $config = Configuration::forSymmetricSigner(new Sha256(), InMemory::plainText($node->daemon_token));
 
         $builder = $config->builder(new TimestampDates())
             ->issuedBy(config('app.url'))
@@ -73,12 +77,12 @@ class NodeJWTService
             ->issuedAt(CarbonImmutable::now())
             ->canOnlyBeUsedAfter(CarbonImmutable::now()->subMinutes(5));
 
-        if ($this->expiresAt) {
-            $builder = $builder->expiresAt($this->expiresAt);
-        }
+        $builder = $builder->expiresAt($this->expiresAt);
 
         if (!empty($this->subject)) {
-            $builder = $builder->relatedTo($this->subject)->withHeader('sub', $this->subject);
+            $builder = $builder
+                ->relatedTo($this->subject)
+                ->withHeader('sub', $this->subject);
         }
 
         foreach ($this->claims as $key => $value) {
@@ -86,14 +90,7 @@ class NodeJWTService
         }
 
         if (!is_null($this->user)) {
-            $builder = $builder
-                ->withClaim('user_uuid', $this->user->uuid)
-                // The "user_id" claim is deprecated and should not be referenced — it remains
-                // here solely to ensure older versions of Wings are unaffected when the Panel
-                // is updated.
-                //
-                // This claim will be removed in Panel@1.11 or later.
-                ->withClaim('user_id', $this->user->id);
+            $builder = $builder->withClaim('user_uuid', $this->user->uuid);
         }
 
         return $builder

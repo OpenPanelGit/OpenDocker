@@ -1,12 +1,13 @@
 <?php
 
-namespace Pterodactyl\Listeners\Auth;
+namespace App\Listeners\Auth;
 
-use Pterodactyl\Facades\Activity;
-use Pterodactyl\Events\Auth\ProvidedAuthenticationToken;
+use App\Events\Auth\ProvidedAuthenticationToken;
+use App\Facades\Activity;
 
 class TwoFactorListener
 {
+    // TODO: add event to filament
     public function handle(ProvidedAuthenticationToken $event): void
     {
         Activity::event($event->recovery ? 'auth:recovery-token' : 'auth:token')

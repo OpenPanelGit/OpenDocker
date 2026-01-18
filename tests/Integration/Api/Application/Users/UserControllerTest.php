@@ -1,20 +1,22 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Application\Users;
+namespace App\Tests\Integration\Api\Application\Users;
 
-use Pterodactyl\Models\User;
+use App\Models\Server;
+use App\Models\User;
+use App\Services\Acl\Api\AdminAcl;
+use App\Tests\Integration\Api\Application\ApplicationApiIntegrationTestCase;
+use App\Transformers\Api\Application\ServerTransformer;
+use App\Transformers\Api\Application\UserTransformer;
 use Illuminate\Http\Response;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Pterodactyl\Transformers\Api\Application\UserTransformer;
-use Pterodactyl\Transformers\Api\Application\ServerTransformer;
-use Pterodactyl\Tests\Integration\Api\Application\ApplicationApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class UserControllerTest extends ApplicationApiIntegrationTestCase
 {
     /**
      * Test the response when requesting all users on the panel.
      */
-    public function testGetUsers()
+    public function test_get_users(): void
     {
         $user = User::factory()->create();
 
@@ -24,8 +26,8 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
         $response->assertJsonStructure([
             'object',
             'data' => [
-                ['object', 'attributes' => ['id', 'external_id', 'uuid', 'username', 'email', 'first_name', 'last_name', 'language', 'root_admin', '2fa', 'created_at', 'updated_at']],
-                ['object', 'attributes' => ['id', 'external_id', 'uuid', 'username', 'email', 'first_name', 'last_name', 'language', 'root_admin', '2fa', 'created_at', 'updated_at']],
+                ['object', 'attributes' => ['id', 'external_id', 'is_managed_externally', 'uuid', 'username', 'email', 'language', 'root_admin', '2fa_enabled', '2fa', 'created_at', 'updated_at']],
+                ['object', 'attributes' => ['id', 'external_id', 'is_managed_externally', 'uuid', 'username', 'email', 'language', 'root_admin', '2fa_enabled', '2fa', 'created_at', 'updated_at']],
             ],
             'meta' => ['pagination' => ['total', 'count', 'per_page', 'current_page', 'total_pages']],
         ]);
@@ -49,14 +51,14 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
                 'attributes' => [
                     'id' => $this->getApiUser()->id,
                     'external_id' => $this->getApiUser()->external_id,
+                    'is_managed_externally' => $this->getApiUser()->is_managed_externally,
                     'uuid' => $this->getApiUser()->uuid,
                     'username' => $this->getApiUser()->username,
                     'email' => $this->getApiUser()->email,
-                    'first_name' => $this->getApiUser()->name_first,
-                    'last_name' => $this->getApiUser()->name_last,
                     'language' => $this->getApiUser()->language,
-                    'root_admin' => $this->getApiUser()->root_admin,
-                    '2fa' => (bool) $this->getApiUser()->totp_enabled,
+                    'root_admin' => $this->getApiUser()->isRootAdmin(),
+                    '2fa_enabled' => filled($this->getApiUser()->mfa_app_secret),
+                    '2fa' => filled($this->getApiUser()->mfa_app_secret),
                     'created_at' => $this->formatTimestamp($this->getApiUser()->created_at),
                     'updated_at' => $this->formatTimestamp($this->getApiUser()->updated_at),
                 ],
@@ -66,14 +68,14 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
                 'attributes' => [
                     'id' => $user->id,
                     'external_id' => $user->external_id,
+                    'is_managed_externally' => $user->is_managed_externally,
                     'uuid' => $user->uuid,
                     'username' => $user->username,
                     'email' => $user->email,
-                    'first_name' => $user->name_first,
-                    'last_name' => $user->name_last,
                     'language' => $user->language,
-                    'root_admin' => (bool) $user->root_admin,
-                    '2fa' => (bool) $user->totp_enabled,
+                    'root_admin' => (bool) $user->isRootAdmin(),
+                    '2fa_enabled' => filled($user->mfa_app_secret),
+                    '2fa' => filled($user->mfa_app_secret),
                     'created_at' => $this->formatTimestamp($user->created_at),
                     'updated_at' => $this->formatTimestamp($user->updated_at),
                 ],
@@ -83,7 +85,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test getting a single user.
      */
-    public function testGetSingleUser()
+    public function test_get_single_user(): void
     {
         $user = User::factory()->create();
 
@@ -92,7 +94,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
         $response->assertJsonCount(2);
         $response->assertJsonStructure([
             'object',
-            'attributes' => ['id', 'external_id', 'uuid', 'username', 'email', 'first_name', 'last_name', 'language', 'root_admin', '2fa', 'created_at', 'updated_at'],
+            'attributes' => ['id', 'external_id', 'is_managed_externally', 'uuid', 'username', 'email', 'language', 'root_admin', '2fa', 'created_at', 'updated_at'],
         ]);
 
         $response->assertJson([
@@ -100,14 +102,13 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
             'attributes' => [
                 'id' => $user->id,
                 'external_id' => $user->external_id,
+                'is_managed_externally' => $user->is_managed_externally,
                 'uuid' => $user->uuid,
                 'username' => $user->username,
                 'email' => $user->email,
-                'first_name' => $user->name_first,
-                'last_name' => $user->name_last,
                 'language' => $user->language,
                 'root_admin' => (bool) $user->root_admin,
-                '2fa' => (bool) $user->totp_enabled,
+                '2fa' => filled($user->mfa_app_secret),
                 'created_at' => $this->formatTimestamp($user->created_at),
                 'updated_at' => $this->formatTimestamp($user->updated_at),
             ],
@@ -117,7 +118,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that the correct relationships can be loaded.
      */
-    public function testRelationshipsCanBeLoaded()
+    public function test_relationships_can_be_loaded(): void
     {
         $user = User::factory()->create();
         $server = $this->createServerModel(['user_id' => $user->id]);
@@ -128,7 +129,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
         $response->assertJsonStructure([
             'object',
             'attributes' => [
-                'id', 'external_id', 'uuid', 'username', 'email', 'first_name', 'last_name', 'language', 'root_admin', '2fa', 'created_at', 'updated_at',
+                'id', 'external_id', 'is_managed_externally', 'uuid', 'username', 'email', 'language', 'root_admin', '2fa', 'created_at', 'updated_at',
                 'relationships' => ['servers' => ['object', 'data' => [['object', 'attributes' => []]]]],
             ],
         ]);
@@ -148,9 +149,9 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
      * Test that attempting to load a relationship that the key does not have permission
      * for returns a null object.
      */
-    public function testKeyWithoutPermissionCannotLoadRelationship()
+    public function test_key_without_permission_cannot_load_relationship(): void
     {
-        $this->createNewDefaultApiKey($this->getApiUser(), ['r_servers' => 0]);
+        $this->createNewDefaultApiKey($this->getApiUser(), [Server::RESOURCE_NAME => AdminAcl::NONE]);
 
         $user = User::factory()->create();
         $this->createServerModel(['user_id' => $user->id]);
@@ -182,9 +183,9 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that an invalid external ID returns a 404 error.
      */
-    public function testGetMissingUser()
+    public function test_get_missing_user(): void
     {
-        $response = $this->getJson('/api/application/users/nil');
+        $response = $this->getJson('/api/application/users/12345');
         $this->assertNotFoundJson($response);
     }
 
@@ -192,10 +193,10 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
      * Test that an authentication error occurs if a key does not have permission
      * to access a resource.
      */
-    public function testErrorReturnedIfNoPermission()
+    public function test_error_returned_if_no_permission(): void
     {
         $user = User::factory()->create();
-        $this->createNewDefaultApiKey($this->getApiUser(), ['r_users' => 0]);
+        $this->createNewDefaultApiKey($this->getApiUser(), [User::RESOURCE_NAME => AdminAcl::NONE]);
 
         $response = $this->getJson('/api/application/users/' . $user->id);
         $this->assertAccessDeniedJson($response);
@@ -204,20 +205,18 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that a user can be created.
      */
-    public function testCreateUser()
+    public function test_create_user(): void
     {
         $response = $this->postJson('/api/application/users', [
             'username' => 'testuser',
             'email' => 'test@example.com',
-            'first_name' => 'Test',
-            'last_name' => 'User',
         ]);
 
         $response->assertStatus(Response::HTTP_CREATED);
         $response->assertJsonCount(3);
         $response->assertJsonStructure([
             'object',
-            'attributes' => ['id', 'external_id', 'uuid', 'username', 'email', 'first_name', 'last_name', 'language', 'root_admin', '2fa', 'created_at', 'updated_at'],
+            'attributes' => ['id', 'external_id', 'is_managed_externally', 'uuid', 'username', 'email', 'language', 'root_admin', '2fa', 'created_at', 'updated_at'],
             'meta' => ['resource'],
         ]);
 
@@ -236,21 +235,19 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that a user can be updated.
      */
-    public function testUpdateUser()
+    public function test_update_user(): void
     {
         $user = User::factory()->create();
 
         $response = $this->patchJson('/api/application/users/' . $user->id, [
             'username' => 'new.test.name',
             'email' => 'new@emailtest.com',
-            'first_name' => $user->name_first,
-            'last_name' => $user->name_last,
         ]);
         $response->assertStatus(Response::HTTP_OK);
         $response->assertJsonCount(2);
         $response->assertJsonStructure([
             'object',
-            'attributes' => ['id', 'external_id', 'uuid', 'username', 'email', 'first_name', 'last_name', 'language', 'root_admin', '2fa', 'created_at', 'updated_at'],
+            'attributes' => ['id', 'external_id', 'is_managed_externally', 'uuid', 'username', 'email', 'language', 'root_admin', '2fa', 'created_at', 'updated_at'],
         ]);
 
         $this->assertDatabaseHas('users', ['username' => 'new.test.name', 'email' => 'new@emailtest.com']);
@@ -265,7 +262,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that a user can be deleted from the database.
      */
-    public function testDeleteUser()
+    public function test_delete_user(): void
     {
         $user = User::factory()->create();
         $this->assertDatabaseHas('users', ['id' => $user->id]);
@@ -280,10 +277,10 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
      * Test that an API key without write permissions cannot create, update, or
      * delete a user model.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('userWriteEndpointsDataProvider')]
-    public function testApiKeyWithoutWritePermissions(string $method, string $url)
+    #[DataProvider('userWriteEndpointsDataProvider')]
+    public function test_api_key_without_write_permissions(string $method, string $url): void
     {
-        $this->createNewDefaultApiKey($this->getApiUser(), ['r_users' => AdminAcl::READ]);
+        $this->createNewDefaultApiKey($this->getApiUser(), [User::RESOURCE_NAME => AdminAcl::READ]);
 
         if (str_contains($url, '{id}')) {
             $user = User::factory()->create();

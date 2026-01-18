@@ -1,16 +1,19 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Client;
+namespace App\Http\Controllers\Api\Client;
 
+use App\Facades\Activity;
+use App\Http\Requests\Api\Client\Account\UpdateEmailRequest;
+use App\Http\Requests\Api\Client\Account\UpdatePasswordRequest;
+use App\Http\Requests\Api\Client\Account\UpdateUsernameRequest;
+use App\Services\Users\UserUpdateService;
+use App\Transformers\Api\Client\UserTransformer;
+use Illuminate\Auth\AuthManager;
+use Illuminate\Auth\SessionGuard;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Auth\AuthManager;
-use Illuminate\Http\JsonResponse;
-use Pterodactyl\Facades\Activity;
-use Pterodactyl\Services\Users\UserUpdateService;
-use Pterodactyl\Transformers\Api\Client\AccountTransformer;
-use Pterodactyl\Http\Requests\Api\Client\Account\UpdateEmailRequest;
-use Pterodactyl\Http\Requests\Api\Client\Account\UpdatePasswordRequest;
+use Throwable;
 
 class AccountController extends ClientApiController
 {
@@ -22,14 +25,40 @@ class AccountController extends ClientApiController
         parent::__construct();
     }
 
+    /**
+     * View account
+     *
+     * @return array<array-key, mixed>
+     */
     public function index(Request $request): array
     {
         return $this->fractal->item($request->user())
-            ->transformWith($this->getTransformer(AccountTransformer::class))
+            ->transformWith($this->getTransformer(UserTransformer::class))
             ->toArray();
     }
 
     /**
+     * Update username
+     *
+     * Update the authenticated user's username.
+     */
+    public function updateUsername(UpdateUsernameRequest $request): JsonResponse
+    {
+        $original = $request->user()->username;
+        $this->updateService->handle($request->user(), $request->validated());
+
+        if ($original !== $request->input('username')) {
+            Activity::event('user:account.username-changed')
+                ->property(['old' => $original, 'new' => $request->input('username')])
+                ->log();
+        }
+
+        return new JsonResponse([], Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * Update email
+     *
      * Update the authenticated user's email address.
      */
     public function updateEmail(UpdateEmailRequest $request): JsonResponse
@@ -47,10 +76,12 @@ class AccountController extends ClientApiController
     }
 
     /**
+     * Update password
+     *
      * Update the authenticated user's password. All existing sessions will be logged
      * out immediately.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function updatePassword(UpdatePasswordRequest $request): JsonResponse
     {
@@ -63,8 +94,7 @@ class AccountController extends ClientApiController
         // other devices functionality to work.
         $guard->setUser($user);
 
-        // This method doesn't exist in the stateless Sanctum world.
-        if (method_exists($guard, 'logoutOtherDevices')) {
+        if ($guard instanceof SessionGuard) {
             $guard->logoutOtherDevices($request->input('password'));
         }
 

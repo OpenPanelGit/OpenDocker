@@ -1,17 +1,18 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\Backup;
+namespace App\Tests\Integration\Api\Client\Server\Backup;
 
+use App\Models\Backup;
+use App\Models\Subuser;
+use App\Services\Backups\DeleteBackupService;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Carbon\CarbonImmutable;
-use Pterodactyl\Models\Backup;
-use Pterodactyl\Models\Subuser;
-use Pterodactyl\Services\Backups\DeleteBackupService;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class BackupAuthorizationTest extends ClientApiIntegrationTestCase
 {
-    #[\PHPUnit\Framework\Attributes\DataProvider('methodDataProvider')]
-    public function testAccessToAServersBackupIsRestrictedProperly(string $method, string $endpoint)
+    #[DataProvider('methodDataProvider')]
+    public function test_access_to_a_servers_backup_is_restricted_properly(string $method, string $endpoint): void
     {
         // The API $user is the owner of $server1.
         [$user, $server1] = $this->generateTestAccount();

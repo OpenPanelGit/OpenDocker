@@ -1,17 +1,17 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Servers;
+namespace App\Http\Requests\Api\Application\Servers;
 
-use Pterodactyl\Models\Server;
+use App\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Models\Objects\DeploymentObject;
+use App\Models\Server;
+use App\Services\Acl\Api\AdminAcl;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Pterodactyl\Models\Objects\DeploymentObject;
-use Pterodactyl\Http\Requests\Api\Application\ApplicationApiRequest;
 
 class StoreServerRequest extends ApplicationApiRequest
 {
-    protected ?string $resource = AdminAcl::RESOURCE_SERVERS;
+    protected ?string $resource = Server::RESOURCE_NAME;
 
     protected int $permission = AdminAcl::WRITE;
 
@@ -28,17 +28,15 @@ class StoreServerRequest extends ApplicationApiRequest
             'description' => array_merge(['nullable'], $rules['description']),
             'user' => $rules['owner_id'],
             'egg' => $rules['egg_id'],
-            'docker_image' => $rules['image'],
-            'startup' => $rules['startup'],
+            'docker_image' => 'sometimes|string',
+            'startup' => 'sometimes|string',
             'environment' => 'present|array',
             'skip_scripts' => 'sometimes|boolean',
-            'oom_disabled' => 'sometimes|boolean',
-            'exclude_from_resource_calculation' => 'sometimes|boolean',
+            'oom_killer' => 'sometimes|boolean',
 
             // Resource limitations
             'limits' => 'required|array',
             'limits.memory' => $rules['memory'],
-            'limits.overhead_memory' => $rules['overhead_memory'],
             'limits.swap' => $rules['swap'],
             'limits.disk' => $rules['disk'],
             'limits.io' => $rules['io'],
@@ -50,7 +48,6 @@ class StoreServerRequest extends ApplicationApiRequest
             'feature_limits.databases' => $rules['database_limit'],
             'feature_limits.allocations' => $rules['allocation_limit'],
             'feature_limits.backups' => $rules['backup_limit'],
-            'feature_limits.backup_storage_mb' => $rules['backup_storage_limit'],
 
             // Placeholders for rules added in withValidator() function.
             'allocation.default' => '',
@@ -58,18 +55,45 @@ class StoreServerRequest extends ApplicationApiRequest
 
             // Automatic deployment rules
             'deploy' => 'sometimes|required|array',
-            'deploy.locations' => 'array',
-            'deploy.locations.*' => 'integer|min:1',
-            'deploy.dedicated_ip' => 'required_with:deploy,boolean',
+            // Locations are deprecated, use tags
+            'deploy.locations' => 'sometimes|array',
+            'deploy.locations.*' => 'required_with:deploy.locations|integer|min:1',
+            'deploy.tags' => 'array',
+            'deploy.tags.*' => 'required_with:deploy.tags|string|min:1',
+            'deploy.dedicated_ip' => 'required_with:deploy|boolean',
             'deploy.port_range' => 'array',
             'deploy.port_range.*' => 'string',
-
             'start_on_completion' => 'sometimes|boolean',
         ];
     }
 
     /**
      * Normalize the data into a format that can be consumed by the service.
+     *
+     * @return array{
+     *     external_id: int,
+     *     name: string,
+     *     description: string,
+     *     owner_id: int,
+     *     egg_id: int,
+     *     image: string,
+     *     startup: string,
+     *     environment: string,
+     *     memory: int,
+     *     swap: int,
+     *     disk: int,
+     *     io: int,
+     *     cpu: int,
+     *     threads: int,
+     *     skip_scripts: bool,
+     *     allocation_id: int,
+     *     allocation_additional: int[],
+     *     start_on_completion: bool,
+     *     database_limit: int,
+     *     allocation_limit: int,
+     *     backup_limit: int,
+     *     oom_killer: bool,
+     * }
      */
     public function validated($key = null, $default = null): array
     {
@@ -85,7 +109,6 @@ class StoreServerRequest extends ApplicationApiRequest
             'startup' => array_get($data, 'startup'),
             'environment' => array_get($data, 'environment'),
             'memory' => array_get($data, 'limits.memory'),
-            'overhead_memory' => array_get($data, 'limits.overhead_memory', 0),
             'swap' => array_get($data, 'limits.swap'),
             'disk' => array_get($data, 'limits.disk'),
             'io' => array_get($data, 'limits.io'),
@@ -98,9 +121,7 @@ class StoreServerRequest extends ApplicationApiRequest
             'database_limit' => array_get($data, 'feature_limits.databases'),
             'allocation_limit' => array_get($data, 'feature_limits.allocations'),
             'backup_limit' => array_get($data, 'feature_limits.backups'),
-            'backup_storage_limit' => array_get($data, 'feature_limits.backup_storage_mb'),
-            'oom_disabled' => array_get($data, 'oom_disabled'),
-            'exclude_from_resource_calculation' => array_get($data, 'exclude_from_resource_calculation', false),
+            'oom_killer' => array_get($data, 'oom_killer'),
         ];
     }
 
@@ -129,7 +150,12 @@ class StoreServerRequest extends ApplicationApiRequest
             return !$input->deploy;
         });
 
+        /** @deprecated use tags instead */
         $validator->sometimes('deploy.locations', 'present', function ($input) {
+            return $input->deploy;
+        });
+
+        $validator->sometimes('deploy.tags', 'present', function ($input) {
             return $input->deploy;
         });
 
@@ -149,7 +175,7 @@ class StoreServerRequest extends ApplicationApiRequest
 
         $object = new DeploymentObject();
         $object->setDedicated($this->input('deploy.dedicated_ip', false));
-        $object->setLocations($this->input('deploy.locations', []));
+        $object->setTags($this->input('deploy.tags', $this->input('deploy.locations', [])));
         $object->setPorts($this->input('deploy.port_range', []));
 
         return $object;

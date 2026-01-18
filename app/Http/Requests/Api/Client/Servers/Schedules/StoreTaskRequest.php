@@ -1,8 +1,8 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Schedules;
+namespace App\Http\Requests\Api\Client\Servers\Schedules;
 
-use Pterodactyl\Models\Permission;
+use App\Enums\SubuserPermission;
 
 class StoreTaskRequest extends ViewScheduleRequest
 {
@@ -11,25 +11,16 @@ class StoreTaskRequest extends ViewScheduleRequest
      * check if they can modify a schedule to determine if they're able to do this. There
      * are no task specific permissions.
      */
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_SCHEDULE_UPDATE;
+        return SubuserPermission::ScheduleUpdate;
     }
 
     public function rules(): array
     {
         return [
-            'action' => 'required|in:command,power,backup',
-            'payload' => [
-                'required_unless:action,backup',
-                'string',
-                'nullable',
-                function ($attribute, $value, $fail) {
-                    if ($this->input('action') === 'power' && !in_array($value, ['start', 'stop', 'restart', 'kill'])) {
-                        $fail('The power action must be one of: start, stop, restart, kill.');
-                    }
-                },
-            ],
+            'action' => 'required|in:command,power,backup,delete_files',
+            'payload' => 'required_unless:action,backup|string|nullable',
             'time_offset' => 'required|numeric|min:0|max:900',
             'sequence_id' => 'sometimes|required|numeric|min:1',
             'continue_on_failure' => 'sometimes|required|boolean',

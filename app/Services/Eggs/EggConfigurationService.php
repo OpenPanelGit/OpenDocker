@@ -1,13 +1,11 @@
 <?php
 
-namespace Pterodactyl\Services\Eggs;
+namespace App\Services\Eggs;
 
+use App\Models\Server;
+use App\Services\Servers\ServerConfigurationStructureService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Pterodactyl\Models\Server;
-use Illuminate\Support\Facades\Log;
-use Pterodactyl\Services\Servers\ServerConfigurationStructureService;
-
 
 class EggConfigurationService
 {
@@ -18,6 +16,19 @@ class EggConfigurationService
 
     /**
      * Return an Egg file to be used by the Daemon.
+     *
+     * @return array{
+     *     startup: array{done: string[], user_interaction: string[], strip_ansi: bool},
+     *     stop: array{type: string, value: string},
+     *     configs: list<array{
+     *         file: string,
+     *         replace: list<array{
+     *             match: string,
+     *             if_value?: string,
+     *             replace_with: string
+     *         }>
+     *     }>
+     * }
      */
     public function handle(Server $server): array
     {
@@ -35,6 +46,9 @@ class EggConfigurationService
 
     /**
      * Convert the "done" variable into an array if it is not currently one.
+     *
+     * @param  array{done: string|string[], strip_ansi: bool}  $startup
+     * @return array{done: string[], user_interaction: string[], strip_ansi: bool}
      */
     protected function convertStartupToNewFormat(array $startup): array
     {
@@ -53,6 +67,8 @@ class EggConfigurationService
      * For most eggs, this ends up just being a command sent to the server console, but
      * if the stop command is something starting with a caret (^), it will be converted
      * into the associated kill signal for the instance.
+     *
+     * @return array{type: string, value: string}
      */
     protected function convertStopToNewFormat(string $stop): array
     {
@@ -71,27 +87,30 @@ class EggConfigurationService
         ];
     }
 
-    protected function replacePlaceholders(Server $server, object $configs): array
+    /**
+     * @param  array<string, mixed>  $configs
+     * @return array<int, array<string, mixed>>
+     */
+    protected function replacePlaceholders(Server $server, object|array $configs): array
     {
         // Get the legacy configuration structure for the server so that we
         // can property map the egg placeholders to values.
-        $structure = $this->configurationStructureService->handle($server, [], true);
+        $structure = $this->configurationStructureService->handle($server);
 
         $response = [];
-        // Normalize the output of the configuration for the new Wings Daemon to more
+        // Normalize the output of the configuration for the new Daemon to more
         // easily ingest, as well as make things more flexible down the road.
         foreach ($configs as $file => $data) {
             // Try to head off any errors relating to parsing a set of configuration files
             // or other JSON data for the egg. This should probably be blocked at the time
             // of egg creation/update, but it isn't so this check will at least prevent a
-            // 500 error which would crash the entire Wings boot process.
-            //
-            // @see https://github.com/pterodactyl/panel/issues/3055
+            // 500 error which would crash the entire daemon boot process.
             if (!is_object($data) || !isset($data->find)) {
                 continue;
             }
 
             $append = array_merge((array) $data, ['file' => $file, 'replace' => []]);
+
             foreach ($this->iterate($data->find, $structure) as $find => $replace) {
                 if (is_object($replace)) {
                     foreach ($replace as $match => $replaceWith) {
@@ -120,37 +139,8 @@ class EggConfigurationService
     }
 
     /**
-     * Replaces the legacy modifies from eggs with their new counterpart. The legacy Daemon would
-     * set SERVER_MEMORY, SERVER_IP, and SERVER_PORT with their respective values on the Daemon
-     * side. Ensure that anything referencing those properly replaces them with the matching config
-     * value.
+     * @param  array{string, mixed}  $structure
      */
-    protected function replaceLegacyModifiers(string $key, string $value): string
-    {
-        switch ($key) {
-            case 'config.docker.interface':
-                $replace = 'config.docker.network.interface';
-                break;
-            case 'server.build.env.SERVER_MEMORY':
-            case 'env.SERVER_MEMORY':
-                $replace = 'server.build.memory';
-                break;
-            case 'server.build.env.SERVER_IP':
-            case 'env.SERVER_IP':
-                $replace = 'server.build.default.ip';
-                break;
-            case 'server.build.env.SERVER_PORT':
-            case 'env.SERVER_PORT':
-                $replace = 'server.build.default.port';
-                break;
-            default:
-                // By default, we don't need to change anything, only if we ended up matching a specific legacy item.
-                $replace = $key;
-        }
-
-        return str_replace("{{{$key}}}", "{{{$replace}}}", $value);
-    }
-
     protected function matchAndReplaceKeys(mixed $value, array $structure): mixed
     {
         preg_match_all('/{{(?<key>[\w.-]*)}}/', $value, $matches);
@@ -170,8 +160,6 @@ class EggConfigurationService
                 continue;
             }
 
-            $value = $this->replaceLegacyModifiers($key, $value);
-
             // We don't want to do anything with config keys since the Daemon will need to handle
             // that. For example, the Spigot egg uses "config.docker.interface" to identify the Docker
             // interface to proxy through, but the Panel would be unaware of that.
@@ -185,6 +173,7 @@ class EggConfigurationService
                 $plucked = Arr::get($structure, preg_replace('/^server\./', '', $key), '');
 
                 $value = str_replace("{{{$key}}}", $plucked, $value);
+
                 continue;
             }
 
@@ -192,7 +181,7 @@ class EggConfigurationService
             // variable from the server configuration.
             $plucked = Arr::get(
                 $structure,
-                preg_replace('/^env\./', 'build.env.', $key),
+                preg_replace('/^env\./', 'environment.', $key),
                 ''
             );
 
@@ -206,6 +195,8 @@ class EggConfigurationService
      * Iterates over a set of "find" values for a given file in the parser configuration. If
      * the value of the line match is something iterable, continue iterating, otherwise perform
      * a match & replace.
+     *
+     * @param  array<mixed>  $structure
      */
     private function iterate(mixed $data, array $structure): mixed
     {

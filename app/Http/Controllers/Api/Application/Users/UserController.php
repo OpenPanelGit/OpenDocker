@@ -1,20 +1,25 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Application\Users;
+namespace App\Http\Controllers\Api\Application\Users;
 
-use Pterodactyl\Models\User;
+use App\Exceptions\Model\DataValidationException;
+use App\Http\Controllers\Api\Application\ApplicationApiController;
+use App\Http\Requests\Api\Application\Users\AssignUserRolesRequest;
+use App\Http\Requests\Api\Application\Users\DeleteUserRequest;
+use App\Http\Requests\Api\Application\Users\GetUsersRequest;
+use App\Http\Requests\Api\Application\Users\StoreUserRequest;
+use App\Http\Requests\Api\Application\Users\UpdateUserRequest;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\Users\UserCreationService;
+use App\Services\Users\UserUpdateService;
+use App\Transformers\Api\Application\UserTransformer;
+use Dedoc\Scramble\Attributes\Group;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Spatie\QueryBuilder\QueryBuilder;
-use Pterodactyl\Services\Users\UserUpdateService;
-use Pterodactyl\Services\Users\UserCreationService;
-use Pterodactyl\Services\Users\UserDeletionService;
-use Pterodactyl\Transformers\Api\Application\UserTransformer;
-use Pterodactyl\Http\Requests\Api\Application\Users\GetUsersRequest;
-use Pterodactyl\Http\Requests\Api\Application\Users\StoreUserRequest;
-use Pterodactyl\Http\Requests\Api\Application\Users\DeleteUserRequest;
-use Pterodactyl\Http\Requests\Api\Application\Users\UpdateUserRequest;
-use Pterodactyl\Http\Controllers\Api\Application\ApplicationApiController;
 
+#[Group('User', weight: 0)]
 class UserController extends ApplicationApiController
 {
     /**
@@ -22,20 +27,23 @@ class UserController extends ApplicationApiController
      */
     public function __construct(
         private UserCreationService $creationService,
-        private UserDeletionService $deletionService,
-        private UserUpdateService $updateService,
+        private UserUpdateService $updateService
     ) {
         parent::__construct();
     }
 
     /**
+     * List users
+     *
      * Handle request to list all users on the panel. Returns a JSON-API representation
      * of a collection of users including any defined relations passed in
      * the request.
+     *
+     * @return array<array-key, mixed>
      */
     public function index(GetUsersRequest $request): array
     {
-        $users = QueryBuilder::for(User::query())
+        $users = QueryBuilder::for(User::class)
             ->allowedFilters(['email', 'uuid', 'username', 'external_id'])
             ->allowedSorts(['id', 'uuid'])
             ->paginate($request->query('per_page') ?? 50);
@@ -46,8 +54,12 @@ class UserController extends ApplicationApiController
     }
 
     /**
+     * View user
+     *
      * Handle a request to view a single user. Includes any relations that
      * were defined in the request.
+     *
+     * @return array<array-key, mixed>
      */
     public function view(GetUsersRequest $request, User $user): array
     {
@@ -57,6 +69,8 @@ class UserController extends ApplicationApiController
     }
 
     /**
+     * Update user
+     *
      * Update an existing user on the system and return the response. Returns the
      * updated user model response on success. Supports handling of token revocation
      * errors when switching a user from an admin to a normal user.
@@ -64,8 +78,9 @@ class UserController extends ApplicationApiController
      * Revocation errors are returned under the 'revocation_errors' key in the response
      * meta. If there are no errors this is an empty array.
      *
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
+     * @return array<array-key, mixed>
+     *
+     * @throws DataValidationException
      */
     public function update(UpdateUserRequest $request, User $user): array
     {
@@ -79,11 +94,65 @@ class UserController extends ApplicationApiController
     }
 
     /**
+     * Assign role to user
+     *
+     * Assign roles to a user.
+     *
+     * @return array<array-key, mixed>
+     */
+    public function assignRoles(AssignUserRolesRequest $request, User $user): array
+    {
+        if (!$user->isRootAdmin()) {
+            $rootAdminId = Role::getRootAdmin()->id;
+            foreach ($request->input('roles') as $role) {
+                if ($role === $rootAdminId) {
+                    continue;
+                }
+
+                $user->assignRole($role);
+            }
+        }
+
+        $response = $this->fractal->item($user)
+            ->transformWith($this->getTransformer(UserTransformer::class));
+
+        return $response->toArray();
+    }
+
+    /**
+     * Unassign role from user
+     *
+     * Removes roles from a user.
+     *
+     * @return array<array-key, mixed>
+     */
+    public function removeRoles(AssignUserRolesRequest $request, User $user): array
+    {
+        if (!$user->isRootAdmin()) {
+            $rootAdminId = Role::getRootAdmin()->id;
+            foreach ($request->input('roles') as $role) {
+                if ($role === $rootAdminId) {
+                    continue;
+                }
+
+                $user->removeRole($role);
+            }
+        }
+
+        $response = $this->fractal->item($user)
+            ->transformWith($this->getTransformer(UserTransformer::class));
+
+        return $response->toArray();
+    }
+
+    /**
+     * Create user
+     *
      * Store a new user on the system. Returns the created user and an HTTP/201
      * header on successful creation.
      *
-     * @throws \Exception
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
+     * @throws Exception
+     * @throws DataValidationException
      */
     public function store(StoreUserRequest $request): JsonResponse
     {
@@ -100,15 +169,18 @@ class UserController extends ApplicationApiController
     }
 
     /**
-     * Handle a request to delete a user from the Panel. Returns a HTTP/204 response
-     * on successful deletion.
+     * Delete user
      *
-     * @throws \Pterodactyl\Exceptions\DisplayException
+     * Handle a request to delete a user from the Panel. Returns a HTTP/204 response on successful deletion.
      */
     public function delete(DeleteUserRequest $request, User $user): JsonResponse
     {
-        $this->deletionService->handle($user);
+        if (!$user->isRootAdmin()) {
+            $user->delete();
 
-        return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
+            return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
+        }
+
+        return new JsonResponse([], JsonResponse::HTTP_FORBIDDEN);
     }
 }

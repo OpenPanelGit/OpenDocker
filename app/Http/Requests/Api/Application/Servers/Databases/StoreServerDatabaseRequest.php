@@ -1,18 +1,19 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Servers\Databases;
+namespace App\Http\Requests\Api\Application\Servers\Databases;
 
-use Webmozart\Assert\Assert;
-use Pterodactyl\Models\Server;
-use Illuminate\Validation\Rule;
+use App\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Models\Database;
+use App\Models\Server;
+use App\Services\Acl\Api\AdminAcl;
+use App\Services\Databases\DatabaseManagementService;
 use Illuminate\Database\Query\Builder;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Pterodactyl\Services\Databases\DatabaseManagementService;
-use Pterodactyl\Http\Requests\Api\Application\ApplicationApiRequest;
+use Illuminate\Validation\Rule;
+use Webmozart\Assert\Assert;
 
 class StoreServerDatabaseRequest extends ApplicationApiRequest
 {
-    protected ?string $resource = AdminAcl::RESOURCE_SERVER_DATABASES;
+    protected ?string $resource = Database::RESOURCE_NAME;
 
     protected int $permission = AdminAcl::WRITE;
 
@@ -21,6 +22,7 @@ class StoreServerDatabaseRequest extends ApplicationApiRequest
      */
     public function rules(): array
     {
+        /** @var Server $server */
         $server = $this->route()->parameter('server');
 
         return [
@@ -40,6 +42,12 @@ class StoreServerDatabaseRequest extends ApplicationApiRequest
 
     /**
      * Return data formatted in the correct format for the service to consume.
+     *
+     * @return array{
+     *     database: string,
+     *     remote: string,
+     *     database_host_id: int,
+     * }
      */
     public function validated($key = null, $default = null): array
     {
@@ -52,6 +60,8 @@ class StoreServerDatabaseRequest extends ApplicationApiRequest
 
     /**
      * Format error messages in a more understandable format for API output.
+     *
+     * @return array<array-key, string>
      */
     public function attributes(): array
     {

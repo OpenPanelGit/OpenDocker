@@ -1,10 +1,10 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\Environment;
+namespace App\Console\Commands\Environment;
 
+use App\Exceptions\PanelException;
+use App\Traits\EnvironmentWriterTrait;
 use Illuminate\Console\Command;
-use Pterodactyl\Traits\Commands\EnvironmentWriterTrait;
-use Illuminate\Contracts\Config\Repository as ConfigRepository;
 
 class EmailSettingsCommand extends Command
 {
@@ -23,51 +23,47 @@ class EmailSettingsCommand extends Command
                             {--username=}
                             {--password=}';
 
+    /** @var array<array-key, mixed> */
     protected array $variables = [];
-
-    /**
-     * EmailSettingsCommand constructor.
-     */
-    public function __construct(private ConfigRepository $config)
-    {
-        parent::__construct();
-    }
 
     /**
      * Handle command execution.
      *
-     * @throws \Pterodactyl\Exceptions\PterodactylException
+     * @throws PanelException
      */
-    public function handle()
+    public function handle(): void
     {
-        $this->variables['MAIL_DRIVER'] = $this->option('driver') ?? $this->choice(
+        $this->variables['MAIL_MAILER'] = $this->option('driver') ?? $this->choice(
             trans('command/messages.environment.mail.ask_driver'),
             [
+                'log' => 'Log',
                 'smtp' => 'SMTP Server',
                 'sendmail' => 'sendmail Binary',
-                'mailgun' => 'Mailgun Transactional Email',
-                'mandrill' => 'Mandrill Transactional Email',
-                'postmark' => 'Postmark Transactional Email',
+                'mailgun' => 'Mailgun',
+                'mandrill' => 'Mandrill',
+                'postmark' => 'Postmark',
             ],
-            $this->config->get('mail.default', 'smtp')
+            env('MAIL_MAILER', env('MAIL_DRIVER', 'smtp')),
         );
 
-        $method = 'setup' . studly_case($this->variables['MAIL_DRIVER']) . 'DriverVariables';
+        $method = 'setup' . studly_case($this->variables['MAIL_MAILER']) . 'DriverVariables';
         if (method_exists($this, $method)) {
             $this->{$method}();
         }
 
         $this->variables['MAIL_FROM_ADDRESS'] = $this->option('email') ?? $this->ask(
             trans('command/messages.environment.mail.ask_mail_from'),
-            $this->config->get('mail.from.address')
+            config('mail.from.address')
         );
 
         $this->variables['MAIL_FROM_NAME'] = $this->option('from') ?? $this->ask(
             trans('command/messages.environment.mail.ask_mail_name'),
-            $this->config->get('mail.from.name')
+            config('mail.from.name')
         );
 
         $this->writeToEnvironment($this->variables);
+
+        $this->call('queue:restart');
 
         $this->line('Updating stored environment configuration file.');
         $this->line('');
@@ -76,77 +72,77 @@ class EmailSettingsCommand extends Command
     /**
      * Handle variables for SMTP driver.
      */
-    private function setupSmtpDriverVariables()
+    private function setupSmtpDriverVariables(): void
     {
         $this->variables['MAIL_HOST'] = $this->option('host') ?? $this->ask(
             trans('command/messages.environment.mail.ask_smtp_host'),
-            $this->config->get('mail.mailers.smtp.host')
+            config('mail.mailers.smtp.host')
         );
 
         $this->variables['MAIL_PORT'] = $this->option('port') ?? $this->ask(
             trans('command/messages.environment.mail.ask_smtp_port'),
-            $this->config->get('mail.mailers.smtp.port')
+            config('mail.mailers.smtp.port')
         );
 
         $this->variables['MAIL_USERNAME'] = $this->option('username') ?? $this->ask(
             trans('command/messages.environment.mail.ask_smtp_username'),
-            $this->config->get('mail.mailers.smtp.username')
+            config('mail.mailers.smtp.username')
         );
 
         $this->variables['MAIL_PASSWORD'] = $this->option('password') ?? $this->secret(
             trans('command/messages.environment.mail.ask_smtp_password')
         );
 
-        $this->variables['MAIL_ENCRYPTION'] = $this->option('encryption') ?? $this->choice(
+        $this->variables['MAIL_SCHEME'] = $this->option('encryption') ?? $this->choice(
             trans('command/messages.environment.mail.ask_encryption'),
             ['tls' => 'TLS', 'ssl' => 'SSL', '' => 'None'],
-            $this->config->get('mail.mailers.smtp.encryption', 'tls')
+            config('mail.mailers.smtp.encryption', 'tls')
         );
     }
 
     /**
      * Handle variables for mailgun driver.
      */
-    private function setupMailgunDriverVariables()
+    private function setupMailgunDriverVariables(): void
     {
         $this->variables['MAILGUN_DOMAIN'] = $this->option('host') ?? $this->ask(
             trans('command/messages.environment.mail.ask_mailgun_domain'),
-            $this->config->get('services.mailgun.domain')
+            config('services.mailgun.domain')
         );
 
         $this->variables['MAILGUN_SECRET'] = $this->option('password') ?? $this->ask(
             trans('command/messages.environment.mail.ask_mailgun_secret'),
-            $this->config->get('services.mailgun.secret')
+            config('services.mailgun.secret')
         );
 
         $this->variables['MAILGUN_ENDPOINT'] = $this->option('endpoint') ?? $this->ask(
             trans('command/messages.environment.mail.ask_mailgun_endpoint'),
-            $this->config->get('services.mailgun.endpoint')
+            config('services.mailgun.endpoint')
         );
     }
 
     /**
      * Handle variables for mandrill driver.
      */
-    private function setupMandrillDriverVariables()
+    private function setupMandrillDriverVariables(): void
     {
         $this->variables['MANDRILL_SECRET'] = $this->option('password') ?? $this->ask(
             trans('command/messages.environment.mail.ask_mandrill_secret'),
-            $this->config->get('services.mandrill.secret')
+            config('services.mandrill.secret')
         );
     }
 
     /**
      * Handle variables for postmark driver.
      */
-    private function setupPostmarkDriverVariables()
+    private function setupPostmarkDriverVariables(): void
     {
         $this->variables['MAIL_DRIVER'] = 'smtp';
         $this->variables['MAIL_HOST'] = 'smtp.postmarkapp.com';
         $this->variables['MAIL_PORT'] = 587;
         $this->variables['MAIL_USERNAME'] = $this->variables['MAIL_PASSWORD'] = $this->option('username') ?? $this->ask(
             trans('command/messages.environment.mail.ask_postmark_username'),
-            $this->config->get('mail.username')
+            config('mail.username')
         );
     }
 }

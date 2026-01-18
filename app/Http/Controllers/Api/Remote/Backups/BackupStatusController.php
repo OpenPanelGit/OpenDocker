@@ -1,38 +1,40 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Remote\Backups;
+namespace App\Http\Controllers\Api\Remote\Backups;
 
+use App\Exceptions\DisplayException;
+use App\Exceptions\Http\HttpForbiddenException;
+use App\Extensions\Backups\BackupManager;
+use App\Extensions\Filesystem\S3Filesystem;
+use App\Facades\Activity;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\Remote\ReportBackupCompleteRequest;
+use App\Models\Backup;
+use App\Models\Node;
+use App\Models\Server;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\Request;
-use Pterodactyl\Models\Backup;
+use Exception;
 use Illuminate\Http\JsonResponse;
-use Pterodactyl\Facades\Activity;
-use Pterodactyl\Exceptions\DisplayException;
-use Pterodactyl\Http\Controllers\Controller;
-use Pterodactyl\Extensions\Backups\BackupManager;
-use Pterodactyl\Extensions\Filesystem\S3Filesystem;
-use Pterodactyl\Exceptions\Http\HttpForbiddenException;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Pterodactyl\Http\Requests\Api\Remote\ReportBackupCompleteRequest;
+use Throwable;
 
 class BackupStatusController extends Controller
 {
     /**
      * BackupStatusController constructor.
      */
-    public function __construct(private BackupManager $backupManager)
-    {
-    }
+    public function __construct(private BackupManager $backupManager) {}
 
     /**
      * Handles updating the state of a backup.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function index(ReportBackupCompleteRequest $request, string $backup): JsonResponse
     {
         // Get the node associated with the request.
-        /** @var \Pterodactyl\Models\Node $node */
+        /** @var Node $node */
         $node = $request->attributes->get('node');
 
         /** @var Backup $model */
@@ -42,7 +44,7 @@ class BackupStatusController extends Controller
 
         // Check that the backup is "owned" by the node making the request. This avoids other nodes
         // from messing with backups that they don't own.
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var Server $server */
         $server = $model->server;
         if ($server->node_id !== $node->id) {
             throw new HttpForbiddenException('You do not have permission to access that backup.');
@@ -66,7 +68,6 @@ class BackupStatusController extends Controller
                 'is_locked' => $successful ? $model->is_locked : false,
                 'checksum' => $successful ? ($request->input('checksum_type') . ':' . $request->input('checksum')) : null,
                 'bytes' => $successful ? $request->input('size') : 0,
-                'snapshot_id' => $successful ? $request->input('snapshot_id') : null,
                 'completed_at' => CarbonImmutable::now(),
             ])->save();
 
@@ -89,7 +90,7 @@ class BackupStatusController extends Controller
      * The only thing the successful field does is update the entry value for the audit logs
      * table tracking for this restoration.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function restore(Request $request, string $backup): JsonResponse
     {
@@ -107,10 +108,11 @@ class BackupStatusController extends Controller
     }
 
     /**
-     * Marks a multipart upload in a given S3-compatible instance as failed or successful for
-     * the given backup.
+     * Marks a multipart upload in a given S3-compatible instance as failed or successful for the given backup.
      *
-     * @throws \Exception
+     * @param  ?array<array{int, etag: string, part_number: string}>  $parts
+     *
+     * @throws Exception
      * @throws DisplayException
      */
     protected function completeMultipartUpload(Backup $backup, S3Filesystem $adapter, bool $successful, ?array $parts): void
@@ -135,21 +137,9 @@ class BackupStatusController extends Controller
         ];
 
         $client = $adapter->getClient();
-        
         if (!$successful) {
-            try {
-                $client->execute($client->getCommand('AbortMultipartUpload', $params));
-                \Log::info('Aborted multipart upload for failed backup', [
-                    'backup_uuid' => $backup->uuid,
-                    'upload_id' => $backup->upload_id,
-                ]);
-            } catch (\Exception $e) {
-                \Log::warning('Failed to abort multipart upload', [
-                    'backup_uuid' => $backup->uuid,
-                    'upload_id' => $backup->upload_id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            $client->execute($client->getCommand('AbortMultipartUpload', $params));
+
             return;
         }
 
@@ -158,57 +148,17 @@ class BackupStatusController extends Controller
             'Parts' => [],
         ];
 
-        try {
-            if (is_null($parts)) {
-                $listPartsResult = $client->execute($client->getCommand('ListParts', $params));
-                $params['MultipartUpload']['Parts'] = $listPartsResult['Parts'] ?? [];
-            } else {
-                foreach ($parts as $part) {
-                    // Validate part data
-                    if (!isset($part['etag']) || !isset($part['part_number'])) {
-                        throw new DisplayException('Invalid part data provided for multipart upload completion.');
-                    }
-                    
-                    $params['MultipartUpload']['Parts'][] = [
-                        'ETag' => $part['etag'],
-                        'PartNumber' => (int) $part['part_number'],
-                    ];
-                }
+        if (is_null($parts)) {
+            $params['MultipartUpload']['Parts'] = $client->execute($client->getCommand('ListParts', $params))['Parts'];
+        } else {
+            foreach ($parts as $part) {
+                $params['MultipartUpload']['Parts'][] = [
+                    'ETag' => $part['etag'],
+                    'PartNumber' => $part['part_number'],
+                ];
             }
-
-            // Ensure we have parts to complete
-            if (empty($params['MultipartUpload']['Parts'])) {
-                throw new DisplayException('No parts found for multipart upload completion.');
-            }
-
-            $client->execute($client->getCommand('CompleteMultipartUpload', $params));
-            
-            \Log::info('Successfully completed multipart upload', [
-                'backup_uuid' => $backup->uuid,
-                'upload_id' => $backup->upload_id,
-                'parts_count' => count($params['MultipartUpload']['Parts']),
-            ]);
-            
-        } catch (\Exception $e) {
-            \Log::error('Failed to complete multipart upload', [
-                'backup_uuid' => $backup->uuid,
-                'upload_id' => $backup->upload_id,
-                'error' => $e->getMessage(),
-            ]);
-            
-            // Try to abort the upload to clean up
-            try {
-                $client->execute($client->getCommand('AbortMultipartUpload', $params));
-            } catch (\Exception $abortException) {
-                \Log::warning('Failed to abort multipart upload after completion failure', [
-                    'backup_uuid' => $backup->uuid,
-                    'upload_id' => $backup->upload_id,
-                    'abort_error' => $abortException->getMessage(),
-                ]);
-            }
-            
-            throw $e;
         }
-    }
 
+        $client->execute($client->getCommand('CompleteMultipartUpload', $params));
+    }
 }

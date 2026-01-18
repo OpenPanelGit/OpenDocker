@@ -1,31 +1,33 @@
 <?php
 
-namespace Pterodactyl\Services\Activity;
+namespace App\Services\Activity;
 
-use Illuminate\Support\Arr;
-use Webmozart\Assert\Assert;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
-use Pterodactyl\Models\ActivityLog;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Request;
-use Pterodactyl\Models\ActivityLogSubject;
-use Illuminate\Database\ConnectionInterface;
+use App\Models\ActivityLog;
+use App\Models\Server;
+use App\Models\User;
+use Closure;
+use Filament\Facades\Filament;
 use Illuminate\Contracts\Auth\Factory as AuthFactory;
+use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Request;
+use Throwable;
+use Webmozart\Assert\Assert;
 
 class ActivityLogService
 {
     protected ?ActivityLog $activity = null;
 
+    /** @var array<User> */
     protected array $subjects = [];
 
     public function __construct(
         protected AuthFactory $manager,
-        protected ActivityLogBatchService $batch,
         protected ActivityLogTargetableService $targetable,
-        protected ConnectionInterface $connection,
-    ) {
-    }
+        protected ConnectionInterface $connection
+    ) {}
 
     /**
      * Sets the activity logger as having been caused by an anonymous
@@ -65,7 +67,7 @@ class ActivityLogService
      *
      * @template T extends \Illuminate\Database\Eloquent\Model|\Illuminate\Contracts\Auth\Authenticatable
      *
-     * @param T|T[]|null $subjects
+     * @param  T|T[]|null  $subjects
      */
     public function subject(...$subjects): self
     {
@@ -101,7 +103,8 @@ class ActivityLogService
     /**
      * Sets a custom property on the activity log instance.
      *
-     * @param string|array $key
+     * @param  string|array<string, mixed>  $key
+     * @param  mixed  $value
      */
     public function property($key, $value = null): self
     {
@@ -140,13 +143,12 @@ class ActivityLogService
 
         try {
             return $this->save();
-        } catch (\Throwable|\Exception $exception) {
+        } catch (Throwable $exception) {
             if (config('app.env') !== 'production') {
-                /* @noinspection PhpUnhandledExceptionInspection */
                 throw $exception;
             }
 
-            Log::error($exception);
+            logger()->error($exception);
         }
 
         return $activity;
@@ -166,9 +168,9 @@ class ActivityLogService
      * and will only save the activity log entry if everything else successfully
      * settles.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
-    public function transaction(\Closure $callback)
+    public function transaction(Closure $callback): mixed
     {
         return $this->connection->transaction(function () use ($callback) {
             $response = $callback($this);
@@ -199,30 +201,31 @@ class ActivityLogService
 
         $this->activity = new ActivityLog([
             'ip' => Request::ip(),
-            'batch_uuid' => $this->batch->uuid(),
             'properties' => Collection::make([]),
             'api_key_id' => $this->targetable->apiKeyId(),
         ]);
 
         if ($subject = $this->targetable->subject()) {
             $this->subject($subject);
+        } elseif ($tenant = Filament::getTenant()) {
+            if ($tenant instanceof Server) {
+                $this->subject($tenant);
+            }
         }
 
         if ($actor = $this->targetable->actor()) {
             $this->actor($actor);
         } elseif ($user = $this->manager->guard()->user()) {
-            if ($user instanceof Model) {
-                $this->actor($user);
-            }
+            $this->actor($user);
         }
 
         return $this->activity;
     }
 
     /**
-     * Saves the activity log instance and attaches all of the subject models.
+     * Saves the activity log instance and attaches all the subject models.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     protected function save(): ActivityLog
     {
@@ -231,16 +234,12 @@ class ActivityLogService
         $response = $this->connection->transaction(function () {
             $this->activity->save();
 
-            $subjects = Collection::make($this->subjects)
-                ->map(fn (Model $subject) => [
-                    'activity_log_id' => $this->activity->id,
+            foreach ($this->subjects as $subject) {
+                $this->activity->subjects()->forceCreate([
                     'subject_id' => $subject->getKey(),
                     'subject_type' => $subject->getMorphClass(),
-                ])
-                ->values()
-                ->toArray();
-
-            ActivityLogSubject::insert($subjects);
+                ]);
+            }
 
             return $this->activity;
         });

@@ -1,19 +1,23 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Client;
+namespace App\Http\Controllers\Api\Client;
 
-use Pterodactyl\Models\ApiKey;
+use App\Exceptions\DisplayException;
+use App\Facades\Activity;
+use App\Http\Requests\Api\Client\Account\StoreApiKeyRequest;
+use App\Http\Requests\Api\Client\ClientApiRequest;
+use App\Models\ApiKey;
+use App\Transformers\Api\Client\ApiKeyTransformer;
 use Illuminate\Http\JsonResponse;
-use Pterodactyl\Facades\Activity;
-use Pterodactyl\Exceptions\DisplayException;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
-use Pterodactyl\Transformers\Api\Client\ApiKeyTransformer;
-use Pterodactyl\Http\Requests\Api\Client\Account\StoreApiKeyRequest;
 
 class ApiKeyController extends ClientApiController
 {
     /**
+     * List api keys
+     *
      * Returns all the API keys that exist for the given client.
+     *
+     * @return array<array-key, mixed>
      */
     public function index(ClientApiRequest $request): array
     {
@@ -23,13 +27,17 @@ class ApiKeyController extends ClientApiController
     }
 
     /**
+     * Create api key
+     *
      * Store a new API key for a user's account.
+     *
+     * @return array<array-key, mixed>
      *
      * @throws DisplayException
      */
     public function store(StoreApiKeyRequest $request): array
     {
-        if ($request->user()->apiKeys->count() >= 25) {
+        if ($request->user()->apiKeys->count() >= config('panel.api.key_limit')) {
             throw new DisplayException('You have reached the account limit for number of API keys.');
         }
 
@@ -50,6 +58,8 @@ class ApiKeyController extends ClientApiController
     }
 
     /**
+     * Delete api key
+     *
      * Deletes a given API key.
      */
     public function delete(ClientApiRequest $request, string $identifier): JsonResponse

@@ -1,41 +1,34 @@
 <?php
 
-namespace Pterodactyl\Services\Databases;
+namespace App\Services\Databases;
 
+use App\Exceptions\Service\Database\NoSuitableDatabaseHostException;
+use App\Models\Database;
+use App\Models\DatabaseHost;
+use App\Models\Server;
 use Webmozart\Assert\Assert;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Database;
-use Pterodactyl\Models\DatabaseHost;
-use Pterodactyl\Exceptions\Service\Database\NoSuitableDatabaseHostException;
 
-class DeployServerDatabaseService
+readonly class DeployServerDatabaseService
 {
-    /**
-     * DeployServerDatabaseService constructor.
-     */
-    public function __construct(private DatabaseManagementService $managementService)
-    {
-    }
+    public function __construct(private DatabaseManagementService $managementService) {}
 
     /**
-     * @throws \Throwable
-     * @throws \Pterodactyl\Exceptions\Service\Database\TooManyDatabasesException
-     * @throws \Pterodactyl\Exceptions\Service\Database\DatabaseClientFeatureNotEnabledException
+     * @param  array{database?: string, remote?: string}  $data
      */
     public function handle(Server $server, array $data): Database
     {
         Assert::notEmpty($data['database'] ?? null);
         Assert::notEmpty($data['remote'] ?? null);
 
-        $hosts = DatabaseHost::query()->get()->toBase();
+        $hosts = DatabaseHost::query()->get();
         if ($hosts->isEmpty()) {
             throw new NoSuitableDatabaseHostException();
-        } else {
-            $nodeHosts = $hosts->where('node_id', $server->node_id)->toBase();
+        }
 
-            if ($nodeHosts->isEmpty() && !config('openpanel.client_features.databases.allow_random')) {
-                throw new NoSuitableDatabaseHostException();
-            }
+        $nodeHosts = $server->node->databaseHosts()->get();
+        // TODO: @areyouscared remove allow random feature for database hosts
+        if ($nodeHosts->isEmpty() && !config('panel.client_features.databases.allow_random')) {
+            throw new NoSuitableDatabaseHostException();
         }
 
         return $this->managementService->create($server, [

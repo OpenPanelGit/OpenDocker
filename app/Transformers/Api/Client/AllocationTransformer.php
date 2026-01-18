@@ -1,8 +1,8 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Client;
+namespace App\Transformers\Api\Client;
 
-use Pterodactyl\Models\Allocation;
+use App\Models\Allocation;
 
 class AllocationTransformer extends BaseClientTransformer
 {
@@ -14,7 +14,10 @@ class AllocationTransformer extends BaseClientTransformer
         return 'allocation';
     }
 
-    public function transform(Allocation $model): array
+    /**
+     * @param  Allocation  $model
+     */
+    public function transform($model): array
     {
         return [
             'id' => $model->id,

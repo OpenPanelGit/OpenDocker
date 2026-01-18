@@ -1,8 +1,8 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Servers;
+namespace App\Http\Requests\Api\Application\Servers;
 
-use Pterodactyl\Models\Server;
+use App\Models\Server;
 use Illuminate\Support\Collection;
 
 class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
@@ -12,32 +12,31 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
      */
     public function rules(): array
     {
-        $rules = Server::getRulesForUpdate($this->parameter('server', Server::class));
+        $rules = $this->route() ? Server::getRulesForUpdate($this->parameter('server', Server::class)) : Server::getRules();
 
         return [
             'allocation' => $rules['allocation_id'],
-            'oom_disabled' => $rules['oom_disabled'],
-            'exclude_from_resource_calculation' => $rules['exclude_from_resource_calculation'],
+            'oom_killer' => $rules['oom_killer'],
 
             'limits' => 'sometimes|array',
             'limits.memory' => $this->requiredToOptional('memory', $rules['memory'], true),
-            'limits.overhead_memory' => $this->requiredToOptional('overhead_memory', $rules['overhead_memory'], true),
             'limits.swap' => $this->requiredToOptional('swap', $rules['swap'], true),
             'limits.io' => $this->requiredToOptional('io', $rules['io'], true),
             'limits.cpu' => $this->requiredToOptional('cpu', $rules['cpu'], true),
             'limits.threads' => $this->requiredToOptional('threads', $rules['threads'], true),
             'limits.disk' => $this->requiredToOptional('disk', $rules['disk'], true),
 
-            // Legacy rules to maintain backwards compatable API support without requiring
-            // a major version bump.
-            //
-            // @see https://github.com/pterodactyl/panel/issues/1500
+            // Deprecated - use limits.memory
             'memory' => $this->requiredToOptional('memory', $rules['memory']),
-            'overhead_memory' => $this->requiredToOptional('overhead_memory', $rules['overhead_memory']),
+            // Deprecated - use limits.swap
             'swap' => $this->requiredToOptional('swap', $rules['swap']),
+            // Deprecated - use limits.io
             'io' => $this->requiredToOptional('io', $rules['io']),
+            // Deprecated - use limits.cpu
             'cpu' => $this->requiredToOptional('cpu', $rules['cpu']),
+            // Deprecated - use limits.threads
             'threads' => $this->requiredToOptional('threads', $rules['threads']),
+            // Deprecated - use limits.disk
             'disk' => $this->requiredToOptional('disk', $rules['disk']),
 
             'add_allocations' => 'bail|array',
@@ -49,12 +48,13 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
             'feature_limits.databases' => $rules['database_limit'],
             'feature_limits.allocations' => $rules['allocation_limit'],
             'feature_limits.backups' => $rules['backup_limit'],
-            'feature_limits.backup_storage_mb' => $rules['backup_storage_limit'],
         ];
     }
 
     /**
      * Convert the allocation field into the expected format for the service handler.
+     *
+     * @return array<array-key, string>
      */
     public function validated($key = null, $default = null): array
     {
@@ -64,7 +64,6 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
         $data['database_limit'] = $data['feature_limits']['databases'] ?? null;
         $data['allocation_limit'] = $data['feature_limits']['allocations'] ?? null;
         $data['backup_limit'] = $data['feature_limits']['backups'] ?? null;
-        $data['backup_storage_limit'] = $data['feature_limits']['backup_storage_mb'] ?? null;
         unset($data['allocation'], $data['feature_limits']);
 
         // Adjust the limits field to match what is expected by the model.
@@ -81,6 +80,8 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
 
     /**
      * Custom attributes to use in error message responses.
+     *
+     * @return array<array-key, string>
      */
     public function attributes(): array
     {
@@ -92,7 +93,6 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
             'feature_limits.databases' => 'Database Limit',
             'feature_limits.allocations' => 'Allocation Limit',
             'feature_limits.backups' => 'Backup Limit',
-            'feature_limits.backup_storage_mb' => 'Backup Storage Limit (MB)',
         ];
     }
 
@@ -101,7 +101,8 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
      * compatability with the old API endpoint while also supporting a more correct API
      * call.
      *
-     * @see https://github.com/pterodactyl/panel/issues/1500
+     * @param  array<array-key, mixed>  $rules
+     * @return array<array-key, string>
      */
     protected function requiredToOptional(string $field, array $rules, bool $limits = false): array
     {

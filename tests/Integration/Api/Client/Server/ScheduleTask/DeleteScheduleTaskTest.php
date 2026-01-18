@@ -1,20 +1,20 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\ScheduleTask;
+namespace App\Tests\Integration\Api\Client\Server\ScheduleTask;
 
-use Pterodactyl\Models\Task;
-use Pterodactyl\Models\User;
+use App\Enums\SubuserPermission;
+use App\Models\Schedule;
+use App\Models\Task;
+use App\Models\User;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Illuminate\Http\Response;
-use Pterodactyl\Models\Schedule;
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 
 class DeleteScheduleTaskTest extends ClientApiIntegrationTestCase
 {
     /**
      * Test that an error is returned if the schedule does not belong to the server.
      */
-    public function testScheduleNotBelongingToServerReturnsError()
+    public function test_schedule_not_belonging_to_server_returns_error(): void
     {
         $server2 = $this->createServerModel();
         [$user] = $this->generateTestAccount();
@@ -29,7 +29,7 @@ class DeleteScheduleTaskTest extends ClientApiIntegrationTestCase
      * Test that an error is returned if the task and schedule in the URL do not line up
      * with each other.
      */
-    public function testTaskBelongingToDifferentScheduleReturnsError()
+    public function test_task_belonging_to_different_schedule_returns_error(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
@@ -43,9 +43,9 @@ class DeleteScheduleTaskTest extends ClientApiIntegrationTestCase
     /**
      * Test that a user without the required permissions returns an error.
      */
-    public function testUserWithoutPermissionReturnsError()
+    public function test_user_without_permission_returns_error(): void
     {
-        [$user, $server] = $this->generateTestAccount([Permission::ACTION_SCHEDULE_CREATE]);
+        [$user, $server] = $this->generateTestAccount([SubuserPermission::ScheduleCreate]);
 
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
         $task = Task::factory()->create(['schedule_id' => $schedule->id]);
@@ -61,7 +61,7 @@ class DeleteScheduleTaskTest extends ClientApiIntegrationTestCase
      * Test that a schedule task is deleted and items with a higher sequence ID are decremented
      * properly in the database.
      */
-    public function testScheduleTaskIsDeletedAndSubsequentTasksAreUpdated()
+    public function test_schedule_task_is_deleted_and_subsequent_tasks_are_updated(): void
     {
         [$user, $server] = $this->generateTestAccount();
 

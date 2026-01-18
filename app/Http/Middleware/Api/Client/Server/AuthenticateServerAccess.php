@@ -1,16 +1,20 @@
 <?php
 
-namespace Pterodactyl\Http\Middleware\Api\Client\Server;
+namespace App\Http\Middleware\Api\Client\Server;
 
+use App\Exceptions\Http\Server\ServerStateConflictException;
+use App\Models\Server;
+use App\Models\User;
+use Closure;
 use Illuminate\Http\Request;
-use Pterodactyl\Models\Server;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Pterodactyl\Exceptions\Http\Server\ServerStateConflictException;
 
 class AuthenticateServerAccess
 {
     /**
      * Routes that this middleware should not apply to if the user is an admin.
+     *
+     * @var string[]
      */
     protected array $except = [
         'api:client:server.ws',
@@ -24,9 +28,9 @@ class AuthenticateServerAccess
     /**
      * Authenticate that this server exists and is not suspended or marked as installing.
      */
-    public function handle(Request $request, \Closure $next): mixed
+    public function handle(Request $request, Closure $next): mixed
     {
-        /** @var \Pterodactyl\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $server = $request->route()->parameter('server');
 
@@ -35,9 +39,9 @@ class AuthenticateServerAccess
         }
 
         // At the very least, ensure that the user trying to make this request is the
-        // server owner, a subuser, or a root admin. We'll leave it up to the controllers
+        // server owner, a subuser, or an admin. We'll leave it up to the controllers
         // to authenticate more detailed permissions if needed.
-        if ($user->id !== $server->owner_id && !$user->root_admin) {
+        if ($user->id !== $server->owner_id && $user->cannot('update server', $server)) {
             // Check for subuser status.
             if (!$server->subusers->contains('user_id', $user->id)) {
                 throw new NotFoundHttpException(trans('exceptions.api.resource_not_found'));
@@ -53,7 +57,7 @@ class AuthenticateServerAccess
                 if (($server->isSuspended() || $server->node->isUnderMaintenance()) && !$request->routeIs('api:client:server.resources')) {
                     throw $exception;
                 }
-                if (!$user->root_admin || !$request->routeIs($this->except)) {
+                if ($user->cannot('update server', $server) || !$request->routeIs($this->except)) {
                     throw $exception;
                 }
             }

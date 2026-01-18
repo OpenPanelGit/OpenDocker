@@ -1,9 +1,9 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Client;
+namespace App\Transformers\Api\Client;
 
-use Pterodactyl\Models\Task;
-use Pterodactyl\Models\Schedule;
+use App\Models\Schedule;
+use App\Models\Task;
 use League\Fractal\Resource\Collection;
 
 class ScheduleTransformer extends BaseClientTransformer
@@ -12,15 +12,18 @@ class ScheduleTransformer extends BaseClientTransformer
 
     protected array $defaultIncludes = ['tasks'];
 
+    /**
+     * {@inheritdoc}
+     */
     public function getResourceName(): string
     {
         return Schedule::RESOURCE_NAME;
     }
 
     /**
-     * Returns a transformed schedule model such that a client can view the information.
+     * @param  Schedule  $model
      */
-    public function transform(Schedule $model): array
+    public function transform($model): array
     {
         return [
             'id' => $model->id,
@@ -44,8 +47,6 @@ class ScheduleTransformer extends BaseClientTransformer
 
     /**
      * Allows attaching the tasks specific to the schedule in the response.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeTasks(Schedule $model): Collection
     {

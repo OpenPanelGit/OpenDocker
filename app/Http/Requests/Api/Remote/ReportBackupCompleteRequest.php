@@ -1,11 +1,12 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Remote;
+namespace App\Http\Requests\Api\Remote;
 
 use Illuminate\Foundation\Http\FormRequest;
 
 class ReportBackupCompleteRequest extends FormRequest
 {
+    /** @return array<array-key, string|string[]> */
     public function rules(): array
     {
         return [
@@ -16,7 +17,6 @@ class ReportBackupCompleteRequest extends FormRequest
             'parts' => 'nullable|array',
             'parts.*.etag' => 'required|string',
             'parts.*.part_number' => 'required|numeric',
-            'snapshot_id' => 'nullable|string|max:64',
         ];
     }
 }

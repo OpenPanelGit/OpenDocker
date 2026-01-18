@@ -1,24 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\Application;
 use Illuminate\Support\Facades\Route;
-use Pterodactyl\Http\Controllers\Api\Application;
-use Pterodactyl\Http\Controllers\Base;
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Root Server Controller Routes
-|--------------------------------------------------------------------------
-|
-| Endpoint: /api/application/panel
-|
-*/
-
-Route::group(['prefix' => '/panel'], function () {
-    Route::get('/status', [Base\SystemStatusController::class, 'index']);
-});
-
 
 /*
 |--------------------------------------------------------------------------
@@ -28,15 +11,16 @@ Route::group(['prefix' => '/panel'], function () {
 | Endpoint: /api/application/users
 |
 */
-
-
-Route::group(['prefix' => '/users'], function () {
+Route::prefix('/users')->group(function () {
     Route::get('/', [Application\Users\UserController::class, 'index'])->name('api.application.users');
     Route::get('/{user:id}', [Application\Users\UserController::class, 'view'])->name('api.application.users.view');
     Route::get('/external/{external_id}', [Application\Users\ExternalUserController::class, 'index'])->name('api.application.users.external');
 
     Route::post('/', [Application\Users\UserController::class, 'store']);
     Route::patch('/{user:id}', [Application\Users\UserController::class, 'update']);
+
+    Route::patch('/{user:id}/roles/assign', [Application\Users\UserController::class, 'assignRoles']);
+    Route::patch('/{user:id}/roles/remove', [Application\Users\UserController::class, 'removeRoles']);
 
     Route::delete('/{user:id}', [Application\Users\UserController::class, 'delete']);
 });
@@ -49,7 +33,7 @@ Route::group(['prefix' => '/users'], function () {
 | Endpoint: /api/application/nodes
 |
 */
-Route::group(['prefix' => '/nodes'], function () {
+Route::prefix('/nodes')->group(function () {
     Route::get('/', [Application\Nodes\NodeController::class, 'index'])->name('api.application.nodes');
     Route::get('/deployable', Application\Nodes\NodeDeploymentController::class);
     Route::get('/{node:id}', [Application\Nodes\NodeController::class, 'view'])->name('api.application.nodes.view');
@@ -60,29 +44,11 @@ Route::group(['prefix' => '/nodes'], function () {
 
     Route::delete('/{node:id}', [Application\Nodes\NodeController::class, 'delete']);
 
-    Route::group(['prefix' => '/{node:id}/allocations'], function () {
+    Route::prefix('/{node:id}/allocations')->group(function () {
         Route::get('/', [Application\Nodes\AllocationController::class, 'index'])->name('api.application.allocations');
         Route::post('/', [Application\Nodes\AllocationController::class, 'store']);
         Route::delete('/{allocation:id}', [Application\Nodes\AllocationController::class, 'delete'])->name('api.application.allocations.view');
     });
-});
-
-/*
-|--------------------------------------------------------------------------
-| Location Controller Routes
-|--------------------------------------------------------------------------
-|
-| Endpoint: /api/application/locations
-|
-*/
-Route::group(['prefix' => '/locations'], function () {
-    Route::get('/', [Application\Locations\LocationController::class, 'index'])->name('api.applications.locations');
-    Route::get('/{location:id}', [Application\Locations\LocationController::class, 'view'])->name('api.application.locations.view');
-
-    Route::post('/', [Application\Locations\LocationController::class, 'store']);
-    Route::patch('/{location:id}', [Application\Locations\LocationController::class, 'update']);
-
-    Route::delete('/{location:id}', [Application\Locations\LocationController::class, 'delete']);
 });
 
 /*
@@ -93,7 +59,7 @@ Route::group(['prefix' => '/locations'], function () {
 | Endpoint: /api/application/servers
 |
 */
-Route::group(['prefix' => '/servers'], function () {
+Route::prefix('/servers')->group(function () {
     Route::get('/', [Application\Servers\ServerController::class, 'index'])->name('api.application.servers');
     Route::get('/{server:id}', [Application\Servers\ServerController::class, 'view'])->name('api.application.servers.view');
     Route::get('/external/{external_id}', [Application\Servers\ExternalServerController::class, 'index'])->name('api.application.servers.external');
@@ -106,12 +72,14 @@ Route::group(['prefix' => '/servers'], function () {
     Route::post('/{server:id}/suspend', [Application\Servers\ServerManagementController::class, 'suspend'])->name('api.application.servers.suspend');
     Route::post('/{server:id}/unsuspend', [Application\Servers\ServerManagementController::class, 'unsuspend'])->name('api.application.servers.unsuspend');
     Route::post('/{server:id}/reinstall', [Application\Servers\ServerManagementController::class, 'reinstall'])->name('api.application.servers.reinstall');
+    Route::post('/{server:id}/transfer', [Application\Servers\ServerManagementController::class, 'startTransfer'])->name('api.application.servers.transfer');
+    Route::post('/{server:id}/transfer/cancel', [Application\Servers\ServerManagementController::class, 'cancelTransfer'])->name('api.application.servers.transfer.cancel');
 
     Route::delete('/{server:id}', [Application\Servers\ServerController::class, 'delete']);
     Route::delete('/{server:id}/{force?}', [Application\Servers\ServerController::class, 'delete']);
 
     // Database Management Endpoint
-    Route::group(['prefix' => '/{server:id}/databases'], function () {
+    Route::prefix('/{server:id}/databases')->group(function () {
         Route::get('/', [Application\Servers\DatabaseController::class, 'index'])->name('api.application.servers.databases');
         Route::get('/{database:id}', [Application\Servers\DatabaseController::class, 'view'])->name('api.application.servers.databases.view');
 
@@ -124,19 +92,83 @@ Route::group(['prefix' => '/servers'], function () {
 
 /*
 |--------------------------------------------------------------------------
-| Nest Controller Routes
+| Egg Controller Routes
 |--------------------------------------------------------------------------
 |
-| Endpoint: /api/application/nests
+| Endpoint: /api/application/eggs
 |
 */
-Route::group(['prefix' => '/nests'], function () {
-    Route::get('/', [Application\Nests\NestController::class, 'index'])->name('api.application.nests');
-    Route::get('/{nest:id}', [Application\Nests\NestController::class, 'view'])->name('api.application.nests.view');
+Route::prefix('/eggs')->group(function () {
+    Route::get('/', [Application\Eggs\EggController::class, 'index'])->name('api.application.eggs.eggs');
+    Route::get('/{egg:id}', [Application\Eggs\EggController::class, 'view'])->name('api.application.eggs.eggs.view');
+    Route::get('/{egg:id}/export', [Application\Eggs\EggController::class, 'export'])->name('api.application.eggs.eggs.export');
+    Route::post('/import', [Application\Eggs\EggController::class, 'import'])->name('api.application.eggs.eggs.import');
+    Route::delete('/{egg:id}', [Application\Eggs\EggController::class, 'delete'])->name('api.application.eggs.eggs.delete');
+    Route::delete('/uuid/{egg:uuid}', [Application\Eggs\EggController::class, 'delete'])->name('api.application.eggs.eggs.delete.uuid');
+});
 
-    // Egg Management Endpoint
-    Route::group(['prefix' => '/{nest:id}/eggs'], function () {
-        Route::get('/', [Application\Nests\EggController::class, 'index'])->name('api.application.nests.eggs');
-        Route::get('/{egg:id}', [Application\Nests\EggController::class, 'view'])->name('api.application.nests.eggs.view');
-    });
+/*
+|--------------------------------------------------------------------------
+| Database Host Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/application/database-hosts
+|
+*/
+Route::prefix('/database-hosts')->group(function () {
+    Route::get('/', [Application\DatabaseHosts\DatabaseHostController::class, 'index'])->name('api.application.databasehosts');
+    Route::get('/{database_host:id}', [Application\DatabaseHosts\DatabaseHostController::class, 'view'])->name('api.application.databasehosts.view');
+
+    Route::post('/', [Application\DatabaseHosts\DatabaseHostController::class, 'store']);
+
+    Route::patch('/{database_host:id}', [Application\DatabaseHosts\DatabaseHostController::class, 'update']);
+
+    Route::delete('/{database_host:id}', [Application\DatabaseHosts\DatabaseHostController::class, 'delete']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Mount Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/application/mounts
+|
+*/
+Route::prefix('mounts')->group(function () {
+    Route::get('/', [Application\Mounts\MountController::class, 'index'])->name('api.application.mounts');
+    Route::get('/{mount:id}', [Application\Mounts\MountController::class, 'view'])->name('api.application.mounts.view');
+    Route::get('/{mount:id}/eggs', [Application\Mounts\MountController::class, 'getEggs']);
+    Route::get('/{mount:id}/nodes', [Application\Mounts\MountController::class, 'getNodes']);
+    Route::get('/{mount:id}/servers', [Application\Mounts\MountController::class, 'getServers']);
+
+    Route::post('/', [Application\Mounts\MountController::class, 'store']);
+    Route::post('/{mount:id}/eggs', [Application\Mounts\MountController::class, 'addEggs'])->name('api.application.mounts.eggs');
+    Route::post('/{mount:id}/nodes', [Application\Mounts\MountController::class, 'addNodes'])->name('api.application.mounts.nodes');
+    Route::post('/{mount:id}/servers', [Application\Mounts\MountController::class, 'addServers'])->name('api.application.mounts.servers');
+
+    Route::patch('/{mount:id}', [Application\Mounts\MountController::class, 'update']);
+
+    Route::delete('/{mount:id}', [Application\Mounts\MountController::class, 'delete']);
+    Route::delete('/{mount:id}/eggs/{egg_id}', [Application\Mounts\MountController::class, 'deleteEgg']);
+    Route::delete('/{mount:id}/nodes/{node_id}', [Application\Mounts\MountController::class, 'deleteNode']);
+    Route::delete('/{mount:id}/servers/{server_id}', [Application\Mounts\MountController::class, 'deleteServer']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Role Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/application/roles
+|
+*/
+Route::prefix('/roles')->group(function () {
+    Route::get('/', [Application\Roles\RoleController::class, 'index'])->name('api.application.roles');
+    Route::get('/{role:id}', [Application\Roles\RoleController::class, 'view'])->name('api.application.roles.view');
+
+    Route::post('/', [Application\Roles\RoleController::class, 'store']);
+
+    Route::patch('/{role:id}', [Application\Roles\RoleController::class, 'update']);
+
+    Route::delete('/{role:id}', [Application\Roles\RoleController::class, 'delete']);
 });

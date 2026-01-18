@@ -1,9 +1,9 @@
 <?php
 
-namespace Pterodactyl\Events\Server;
+namespace App\Events\Server;
 
-use Pterodactyl\Events\Event;
-use Pterodactyl\Models\Server;
+use App\Events\Event;
+use App\Models\Server;
 use Illuminate\Queue\SerializesModels;
 
 class Installed extends Event
@@ -13,7 +13,5 @@ class Installed extends Event
     /**
      * Create a new event instance.
      */
-    public function __construct(public Server $server)
-    {
-    }
+    public function __construct(public Server $server, public bool $successful, public bool $initialInstall) {}
 }

@@ -1,30 +1,29 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Application;
+namespace App\Transformers\Api\Application;
 
+use App\Models\ApiKey;
+use App\Services\Acl\Api\AdminAcl;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Illuminate\Http\Request;
-use Webmozart\Assert\Assert;
-use Pterodactyl\Models\ApiKey;
 use Illuminate\Container\Container;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use League\Fractal\TransformerAbstract;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
+use Webmozart\Assert\Assert;
 
-/**
- * @method array transform(Model $model)
- */
 abstract class BaseTransformer extends TransformerAbstract
 {
     public const RESPONSE_TIMEZONE = 'UTC';
 
     protected Request $request;
 
-    /**
-     * BaseTransformer constructor.
-     */
-    public function __construct()
+    /** @var string[] */
+    protected array $availableIncludes = [];
+
+    /** @var string[] */
+    protected array $defaultIncludes = [];
+
+    final public function __construct()
     {
         // Transformers allow for dependency injection on the handle method.
         if (method_exists($this, 'handle')) {
@@ -38,9 +37,16 @@ abstract class BaseTransformer extends TransformerAbstract
     abstract public function getResourceName(): string;
 
     /**
+     * @return array<string, mixed>
+     *
+     * Transforms a Model into a representation that can be shown to regular users of the API.
+     */
+    abstract public function transform($model): array; // @phpstan-ignore missingType.parameter
+
+    /**
      * Sets the request on the instance.
      */
-    public function setRequest(Request $request): self
+    public function setRequest(Request $request): static
     {
         $this->request = $request;
 
@@ -50,17 +56,15 @@ abstract class BaseTransformer extends TransformerAbstract
     /**
      * Returns a new transformer instance with the request set on the instance.
      */
-    public static function fromRequest(Request $request): BaseTransformer
+    public static function fromRequest(Request $request): static
     {
-        return app(static::class)->setRequest($request);
+        return (new static())->setRequest($request);
     }
 
     /**
      * Determine if the API key loaded onto the transformer has permission
      * to access a different resource. This is used when including other
      * models on a transformation request.
-     *
-     * @deprecated — prefer $user->can/cannot methods
      */
     protected function authorize(string $resource): bool
     {
@@ -75,7 +79,7 @@ abstract class BaseTransformer extends TransformerAbstract
         // the user is a root admin at the moment. In a future release we'll be rolling
         // out more specific permissions for keys.
         if ($token->key_type === ApiKey::TYPE_ACCOUNT) {
-            return $this->request->user()->root_admin;
+            return $this->request->user()->isRootAdmin();
         }
 
         return AdminAcl::check($token, $resource);
@@ -85,13 +89,10 @@ abstract class BaseTransformer extends TransformerAbstract
      * Create a new instance of the transformer and pass along the currently
      * set API key.
      *
-     * @template T of \Pterodactyl\Transformers\Api\Application\BaseTransformer
+     * @template T of \App\Transformers\Api\Application\BaseTransformer
      *
-     * @param class-string<T> $abstract
-     *
+     * @param  class-string<T>  $abstract
      * @return T
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      *
      * @noinspection PhpDocSignatureInspection
      */

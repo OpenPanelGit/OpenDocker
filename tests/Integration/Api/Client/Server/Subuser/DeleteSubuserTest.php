@@ -1,13 +1,13 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\Subuser;
+namespace App\Tests\Integration\Api\Client\Server\Subuser;
 
+use App\Enums\SubuserPermission;
+use App\Models\Subuser;
+use App\Models\User;
+use App\Repositories\Daemon\DaemonServerRepository;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Ramsey\Uuid\Uuid;
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Subuser;
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Repositories\Wings\DaemonServerRepository;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 
 class DeleteSubuserTest extends ClientApiIntegrationTestCase
 {
@@ -19,48 +19,46 @@ class DeleteSubuserTest extends ClientApiIntegrationTestCase
      * For example, 12aaaaaa-bbbb-cccc-ddddeeeeffff would be cast to "12" if you tried to cast
      * it to an integer. Then, in the deep API middlewares you would end up trying to load a user
      * with an ID of 12, which may or may not exist and be wrongly assigned to the model object.
-     *
-     * @see https://github.com/pterodactyl/panel/issues/2359
      */
-    public function testCorrectSubuserIsDeletedFromServer()
+    public function test_correct_subuser_is_deleted_from_server(): void
     {
         $this->swap(DaemonServerRepository::class, $mock = \Mockery::mock(DaemonServerRepository::class));
 
         [$user, $server] = $this->generateTestAccount();
 
-        /** @var User $differentUser */
+        /** @var \App\Models\User $differentUser */
         $differentUser = User::factory()->create();
 
         $real = Uuid::uuid4()->toString();
         // Generate a UUID that lines up with a user in the database if it were to be cast to an int.
         $uuid = $differentUser->id . substr($real, strlen((string) $differentUser->id));
 
-        /** @var User $subuser */
+        /** @var \App\Models\User $subuser */
         $subuser = User::factory()->create(['uuid' => $uuid]);
 
         Subuser::query()->forceCreate([
             'user_id' => $subuser->id,
             'server_id' => $server->id,
-            'permissions' => [Permission::ACTION_WEBSOCKET_CONNECT],
+            'permissions' => [SubuserPermission::WebsocketConnect],
         ]);
 
-        $mock->expects('setServer->revokeUserJTI')->with($subuser->id)->andReturnUndefined();
+        $mock->expects('setServer->deauthorize')->with($subuser->uuid)->andReturnUndefined();
 
         $this->actingAs($user)->deleteJson($this->link($server) . "/users/$subuser->uuid")->assertNoContent();
 
         // Try the same test, but this time with a UUID that if cast to an int (shouldn't) line up with
         // anything in the database.
         $uuid = '18180000' . substr(Uuid::uuid4()->toString(), 8);
-        /** @var User $subuser */
+        /** @var \App\Models\User $subuser */
         $subuser = User::factory()->create(['uuid' => $uuid]);
 
         Subuser::query()->forceCreate([
             'user_id' => $subuser->id,
             'server_id' => $server->id,
-            'permissions' => [Permission::ACTION_WEBSOCKET_CONNECT],
+            'permissions' => [SubuserPermission::WebsocketConnect],
         ]);
 
-        $mock->expects('setServer->revokeUserJTI')->with($subuser->id)->andReturnUndefined();
+        $mock->expects('setServer->deauthorize')->with($subuser->uuid)->andReturnUndefined();
 
         $this->actingAs($user)->deleteJson($this->link($server) . "/users/$subuser->uuid")->assertNoContent();
     }

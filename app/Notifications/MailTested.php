@@ -1,17 +1,18 @@
 <?php
 
-namespace Pterodactyl\Notifications;
+namespace App\Notifications;
 
-use Pterodactyl\Models\User;
-use Illuminate\Notifications\Notification;
+use App\Models\User;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
 
 class MailTested extends Notification
 {
-    public function __construct(private User $user)
-    {
-    }
+    public function __construct(private User $user) {}
 
+    /**
+     * @return string[]
+     */
     public function via(): array
     {
         return ['mail'];
@@ -20,8 +21,8 @@ class MailTested extends Notification
     public function toMail(): MailMessage
     {
         return (new MailMessage())
-            ->subject('Pyrodactyl Test Message')
-            ->greeting('Hello ' . $this->user->name . '!')
-            ->line('This is a test of the Pyrodactyl mail system. You\'re good to go!');
+            ->subject('Panel Test Message')
+            ->greeting('Hello ' . $this->user->username . '!')
+            ->line('This is a test of the Panel mail system. You\'re good to go!');
     }
 }

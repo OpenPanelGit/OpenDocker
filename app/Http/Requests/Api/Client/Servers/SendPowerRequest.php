@@ -1,28 +1,29 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers;
+namespace App\Http\Requests\Api\Client\Servers;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
 
 class SendPowerRequest extends ClientApiRequest
 {
     /**
      * Determine if the user has permission to send a power command to a server.
      */
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
         switch ($this->input('signal')) {
             case 'start':
-                return Permission::ACTION_CONTROL_START;
+                return SubuserPermission::ControlStart;
             case 'stop':
             case 'kill':
-                return Permission::ACTION_CONTROL_STOP;
+                return SubuserPermission::ControlStop;
             case 'restart':
-                return Permission::ACTION_CONTROL_RESTART;
+                return SubuserPermission::ControlRestart;
         }
 
-        return '__invalid';
+        // Fallback for invalid signals
+        return SubuserPermission::WebsocketConnect;
     }
 
     /**

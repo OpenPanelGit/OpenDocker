@@ -1,8 +1,8 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\Node;
+namespace App\Console\Commands\Node;
 
-use Pterodactyl\Models\Node;
+use App\Models\Node;
 use Illuminate\Console\Command;
 
 class NodeConfigurationCommand extends Command
@@ -19,14 +19,14 @@ class NodeConfigurationCommand extends Command
 
         /** @var Node $node */
         $node = Node::query()->where($column, $this->argument('node'))->firstOr(function () {
-            $this->error('The selected node does not exist.');
+            $this->error(trans('commands.node_config.error_not_exist'));
 
             exit(1);
         });
 
         $format = $this->option('format');
         if (!in_array($format, ['yaml', 'yml', 'json'])) {
-            $this->error('Invalid format specified. Valid options are "yaml" and "json".');
+            $this->error(trans('commands.node_config.error_invalid_format'));
 
             return 1;
         }

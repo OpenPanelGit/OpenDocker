@@ -1,20 +1,22 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Application\Servers;
+namespace App\Http\Controllers\Api\Application\Servers;
 
-use Illuminate\Http\Response;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Database;
+use App\Http\Controllers\Api\Application\ApplicationApiController;
+use App\Http\Requests\Api\Application\Servers\Databases\GetServerDatabaseRequest;
+use App\Http\Requests\Api\Application\Servers\Databases\GetServerDatabasesRequest;
+use App\Http\Requests\Api\Application\Servers\Databases\ServerDatabaseWriteRequest;
+use App\Http\Requests\Api\Application\Servers\Databases\StoreServerDatabaseRequest;
+use App\Models\Database;
+use App\Models\Server;
+use App\Services\Databases\DatabaseManagementService;
+use App\Transformers\Api\Application\ServerDatabaseTransformer;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
-use Pterodactyl\Services\Databases\DatabasePasswordService;
-use Pterodactyl\Services\Databases\DatabaseManagementService;
-use Pterodactyl\Transformers\Api\Application\ServerDatabaseTransformer;
-use Pterodactyl\Http\Controllers\Api\Application\ApplicationApiController;
-use Pterodactyl\Http\Requests\Api\Application\Servers\Databases\GetServerDatabaseRequest;
-use Pterodactyl\Http\Requests\Api\Application\Servers\Databases\GetServerDatabasesRequest;
-use Pterodactyl\Http\Requests\Api\Application\Servers\Databases\ServerDatabaseWriteRequest;
-use Pterodactyl\Http\Requests\Api\Application\Servers\Databases\StoreServerDatabaseRequest;
+use Illuminate\Http\Response;
+use Throwable;
 
+#[Group('Server - Database')]
 class DatabaseController extends ApplicationApiController
 {
     /**
@@ -22,14 +24,16 @@ class DatabaseController extends ApplicationApiController
      */
     public function __construct(
         private DatabaseManagementService $databaseManagementService,
-        private DatabasePasswordService $databasePasswordService,
     ) {
         parent::__construct();
     }
 
     /**
-     * Return a listing of all databases currently available to a single
-     * server.
+     * List databases
+     *
+     * Return a listing of all databases currently available to a single server.
+     *
+     * @return array<array-key, mixed>
      */
     public function index(GetServerDatabasesRequest $request, Server $server): array
     {
@@ -39,7 +43,11 @@ class DatabaseController extends ApplicationApiController
     }
 
     /**
+     * View database
+     *
      * Return a single server database.
+     *
+     * @return array<array-key, mixed>
      */
     public function view(GetServerDatabaseRequest $request, Server $server, Database $database): array
     {
@@ -49,21 +57,25 @@ class DatabaseController extends ApplicationApiController
     }
 
     /**
+     * Reset password
+     *
      * Reset the password for a specific server database.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function resetPassword(ServerDatabaseWriteRequest $request, Server $server, Database $database): JsonResponse
     {
-        $this->databasePasswordService->handle($database);
+        $this->databaseManagementService->rotatePassword($database);
 
         return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
     }
 
     /**
+     * Create database
+     *
      * Create a new database on the Panel for a given server.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function store(StoreServerDatabaseRequest $request, Server $server): JsonResponse
     {
@@ -83,6 +95,8 @@ class DatabaseController extends ApplicationApiController
     }
 
     /**
+     * Delete database
+     *
      * Handle a request to delete a specific server database from the Panel.
      */
     public function delete(ServerDatabaseWriteRequest $request, Server $server, Database $database): Response

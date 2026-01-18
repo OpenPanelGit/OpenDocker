@@ -1,12 +1,19 @@
 <?php
 
-namespace Pterodactyl\Models;
+namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Exceptions\Service\Allocation\ServerUsingAllocationException;
+use App\Traits\HasValidation;
+use Carbon\Carbon;
+use Database\Factories\AllocationFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Pterodactyl\Models\Allocation.
+ * App\Models\Allocation.
  *
  * @property int $id
  * @property int $node_id
@@ -15,80 +22,81 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property int $port
  * @property int|null $server_id
  * @property string|null $notes
- * @property \Carbon\Carbon|null $created_at
- * @property \Carbon\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property string $alias
  * @property bool $has_alias
+ * @property string $address
  * @property Server|null $server
  * @property Node $node
- * @property string $hashid
+ * @property bool $is_locked
  *
- * @method static \Database\Factories\AllocationFactory factory(...$parameters)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation query()
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation whereIp($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation whereIpAlias($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation whereNodeId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation whereNotes($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation wherePort($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation whereServerId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Allocation whereUpdatedAt($value)
- *
- * @mixin \Eloquent
+ * @method static AllocationFactory factory(...$parameters)
+ * @method static Builder|Allocation newModelQuery()
+ * @method static Builder|Allocation newQuery()
+ * @method static Builder|Allocation query()
+ * @method static Builder|Allocation whereCreatedAt($value)
+ * @method static Builder|Allocation whereId($value)
+ * @method static Builder|Allocation whereIp($value)
+ * @method static Builder|Allocation whereIpAlias($value)
+ * @method static Builder|Allocation whereNodeId($value)
+ * @method static Builder|Allocation whereNotes($value)
+ * @method static Builder|Allocation wherePort($value)
+ * @method static Builder|Allocation whereServerId($value)
+ * @method static Builder|Allocation whereUpdatedAt($value)
  */
 class Allocation extends Model
 {
-    /** @use HasFactory<\Database\Factories\AllocationFactory> */
     use HasFactory;
+    use HasValidation;
 
     /**
      * The resource name for this model when it is transformed into an
-     * API representation using fractal.
+     * API representation using fractal. Also used as name for api key permissions.
      */
     public const RESOURCE_NAME = 'allocation';
 
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'allocations';
+    protected $attributes = [
+        'is_locked' => false,
+    ];
 
     /**
      * Fields that are not mass assignable.
      */
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
-    /**
-     * Cast values to correct type.
-     */
-    protected $casts = [
-        'node_id' => 'integer',
-        'port' => 'integer',
-        'server_id' => 'integer',
-    ];
-
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'node_id' => 'required|exists:nodes,id',
-        'ip' => 'required|ip',
-        'port' => 'required|numeric|between:1024,65535',
-        'ip_alias' => 'nullable|string',
-        'server_id' => 'nullable|exists:servers,id',
-        'notes' => 'nullable|string|max:256',
+        'node_id' => ['required', 'exists:nodes,id'],
+        'ip' => ['required', 'ip'],
+        'port' => ['required', 'numeric', 'between:1024,65535'],
+        'ip_alias' => ['nullable', 'string'],
+        'server_id' => ['nullable', 'exists:servers,id'],
+        'notes' => ['nullable', 'string', 'max:256'],
+        'is_locked' => ['boolean'],
     ];
 
-    public function getRouteKeyName(): string
+    protected static function booted(): void
     {
-        return $this->getKeyName();
+        static::updating(function (self $allocation) {
+            if (is_null($allocation->server_id)) {
+                $allocation->is_locked = false;
+            }
+        });
+
+        static::deleting(function (self $allocation) {
+            throw_if($allocation->server_id, new ServerUsingAllocationException(trans('exceptions.allocations.server_using')));
+        });
     }
 
-    /**
-     * Return a hashid encoded string to represent the ID of the allocation.
-     */
-    public function getHashidAttribute(): string
+    protected function casts(): array
     {
-        return app()->make('hashids')->encode($this->id);
+        return [
+            'node_id' => 'integer',
+            'port' => 'integer',
+            'server_id' => 'integer',
+            'is_locked' => 'bool',
+        ];
     }
 
     /**
@@ -107,9 +115,12 @@ class Allocation extends Model
         return !is_null($this->ip_alias);
     }
 
-    public function toString(): string
+    /** @return Attribute<string, never> */
+    protected function address(): Attribute
     {
-        return sprintf('%s:%s', $this->ip, $this->port);
+        return Attribute::make(
+            get: fn () => (is_ipv6($this->alias) ? "[$this->alias]" : $this->alias) . ":$this->port",
+        );
     }
 
     /**

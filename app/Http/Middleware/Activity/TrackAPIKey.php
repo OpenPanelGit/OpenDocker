@@ -1,10 +1,11 @@
 <?php
 
-namespace Pterodactyl\Http\Middleware\Activity;
+namespace App\Http\Middleware\Activity;
 
+use App\Facades\LogTarget;
+use App\Models\ApiKey;
+use Closure;
 use Illuminate\Http\Request;
-use Pterodactyl\Models\ApiKey;
-use Pterodactyl\Facades\LogTarget;
 
 class TrackAPIKey
 {
@@ -14,7 +15,7 @@ class TrackAPIKey
      * request singleton so that all tracked activity log events are properly associated
      * with the given API key.
      */
-    public function handle(Request $request, \Closure $next): mixed
+    public function handle(Request $request, Closure $next): mixed
     {
         if ($request->user()) {
             $token = $request->user()->currentAccessToken();

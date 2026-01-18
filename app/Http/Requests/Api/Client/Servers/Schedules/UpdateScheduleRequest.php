@@ -1,13 +1,13 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Schedules;
+namespace App\Http\Requests\Api\Client\Servers\Schedules;
 
-use Pterodactyl\Models\Permission;
+use App\Enums\SubuserPermission;
 
 class UpdateScheduleRequest extends StoreScheduleRequest
 {
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_SCHEDULE_UPDATE;
+        return SubuserPermission::ScheduleUpdate;
     }
 }

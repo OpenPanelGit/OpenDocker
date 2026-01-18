@@ -1,61 +1,46 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Users;
+namespace App\Http\Requests\Api\Application\Users;
 
-use Pterodactyl\Models\User;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Pterodactyl\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Models\User;
+use App\Services\Acl\Api\AdminAcl;
 
 class StoreUserRequest extends ApplicationApiRequest
 {
-    protected ?string $resource = AdminAcl::RESOURCE_USERS;
+    protected ?string $resource = User::RESOURCE_NAME;
 
     protected int $permission = AdminAcl::WRITE;
 
     /**
-     * Return the validation rules for this request.
+     * @param  array<array-key, string|string[]> |null  $rules
+     * @return array<array-key, string|string[]>
      */
     public function rules(?array $rules = null): array
     {
         $rules = $rules ?? User::getRules();
 
-        $response = collect($rules)->only([
+        return collect($rules)->only([
             'external_id',
+            'is_managed_externally',
             'email',
             'username',
             'password',
             'language',
-            'root_admin',
+            'timezone',
         ])->toArray();
-
-        $response['first_name'] = $rules['name_first'];
-        $response['last_name'] = $rules['name_last'];
-
-        return $response;
-    }
-
-    public function validated($key = null, $default = null): array
-    {
-        $data = parent::validated();
-
-        $data['name_first'] = $data['first_name'];
-        $data['name_last'] = $data['last_name'];
-
-        unset($data['first_name'], $data['last_name']);
-
-        return $data;
     }
 
     /**
-     * Rename some fields to be more user friendly.
+     * Rename some fields to be more user-friendly.
+     *
+     * @return array<array-key, string>
      */
     public function attributes(): array
     {
         return [
             'external_id' => 'Third Party Identifier',
-            'name_first' => 'First Name',
-            'name_last' => 'Last Name',
-            'root_admin' => 'Root Administrator Status',
+            'is_managed_externally' => 'Is managed by Third Party?',
         ];
     }
 }

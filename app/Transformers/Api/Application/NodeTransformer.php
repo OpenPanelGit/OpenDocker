@@ -1,19 +1,19 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Application;
+namespace App\Transformers\Api\Application;
 
-use Pterodactyl\Models\Node;
-use League\Fractal\Resource\Item;
+use App\Models\Allocation;
+use App\Models\Node;
+use App\Models\Server;
 use League\Fractal\Resource\Collection;
 use League\Fractal\Resource\NullResource;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
 
 class NodeTransformer extends BaseTransformer
 {
     /**
      * List of resources that can be included.
      */
-    protected array $availableIncludes = ['allocations', 'location', 'servers'];
+    protected array $availableIncludes = ['allocations', 'servers'];
 
     /**
      * Return the resource name for the JSONAPI output.
@@ -24,27 +24,23 @@ class NodeTransformer extends BaseTransformer
     }
 
     /**
-     * Return a node transformed into a format that can be consumed by the
-     * external administrative API.
+     * @param  Node  $node
      */
-    public function transform(Node $node): array
+    public function transform($node): array
     {
-        $response = collect($node->toArray())->mapWithKeys(function ($value, $key) {
-            // I messed up early in 2016 when I named this column as poorly
-            // as I did. This is the tragic result of my mistakes.
-            $key = ($key === 'daemonSFTP') ? 'daemonSftp' : $key;
-
-            return [snake_case($key) => $value];
-        })->toArray();
+        $response = collect($node->toArray())
+            ->mapWithKeys(fn ($value, $key) => [snake_case($key) => $value])
+            ->toArray();
 
         $response[$node->getUpdatedAtColumn()] = $this->formatTimestamp($node->updated_at);
         $response[$node->getCreatedAtColumn()] = $this->formatTimestamp($node->created_at);
 
-        $resources = $node->servers()->where('exclude_from_resource_calculation', false)->select(['memory', 'disk'])->get();
+        $resources = $node->servers()->select(['memory', 'disk', 'cpu'])->get();
 
         $response['allocated_resources'] = [
             'memory' => $resources->sum('memory'),
             'disk' => $resources->sum('disk'),
+            'cpu' => $resources->sum('cpu'),
         ];
 
         return $response;
@@ -52,12 +48,10 @@ class NodeTransformer extends BaseTransformer
 
     /**
      * Return the nodes associated with this location.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeAllocations(Node $node): Collection|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_ALLOCATIONS)) {
+        if (!$this->authorize(Allocation::RESOURCE_NAME)) {
             return $this->null();
         }
 
@@ -72,32 +66,10 @@ class NodeTransformer extends BaseTransformer
 
     /**
      * Return the nodes associated with this location.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
-     */
-    public function includeLocation(Node $node): Item|NullResource
-    {
-        if (!$this->authorize(AdminAcl::RESOURCE_LOCATIONS)) {
-            return $this->null();
-        }
-
-        $node->loadMissing('location');
-
-        return $this->item(
-            $node->getRelation('location'),
-            $this->makeTransformer(LocationTransformer::class),
-            'location'
-        );
-    }
-
-    /**
-     * Return the nodes associated with this location.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeServers(Node $node): Collection|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_SERVERS)) {
+        if (!$this->authorize(Server::RESOURCE_NAME)) {
             return $this->null();
         }
 

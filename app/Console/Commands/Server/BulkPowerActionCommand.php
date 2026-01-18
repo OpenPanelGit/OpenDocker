@@ -1,14 +1,14 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\Server;
+namespace App\Console\Commands\Server;
 
-use Pterodactyl\Models\Server;
+use App\Models\Server;
+use App\Repositories\Daemon\DaemonServerRepository;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Factory as ValidatorFactory;
-use Pterodactyl\Repositories\Wings\DaemonPowerRepository;
-use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Illuminate\Validation\ValidationException;
 
 class BulkPowerActionCommand extends Command
 {
@@ -19,26 +19,13 @@ class BulkPowerActionCommand extends Command
 
     protected $description = 'Perform bulk power management on large groupings of servers or nodes at once.';
 
-    /**
-     * BulkPowerActionCommand constructor.
-     */
-    public function __construct(private DaemonPowerRepository $powerRepository, private ValidatorFactory $validator)
-    {
-        parent::__construct();
-    }
-
-    /**
-     * Handle the bulk power request.
-     *
-     * @throws ValidationException
-     */
-    public function handle()
+    public function handle(DaemonServerRepository $serverRepository, ValidatorFactory $validator): void
     {
         $action = $this->argument('action');
         $nodes = empty($this->option('nodes')) ? [] : explode(',', $this->option('nodes'));
         $servers = empty($this->option('servers')) ? [] : explode(',', $this->option('servers'));
 
-        $validator = $this->validator->make([
+        $validator = $validator->make([
             'action' => $action,
             'nodes' => $nodes,
             'servers' => $servers,
@@ -64,13 +51,17 @@ class BulkPowerActionCommand extends Command
         }
 
         $bar = $this->output->createProgressBar($count);
-        $powerRepository = $this->powerRepository;
-        $this->getQueryBuilder($servers, $nodes)->each(function (Server $server) use ($action, $powerRepository, &$bar) {
+
+        $this->getQueryBuilder($servers, $nodes)->get()->each(function ($server, int $index) use ($action, $serverRepository, &$bar): mixed {
             $bar->clear();
 
+            if (!$server instanceof Server) {
+                return null;
+            }
+
             try {
-                $powerRepository->setServer($server)->send($action);
-            } catch (DaemonConnectionException $exception) {
+                $serverRepository->setServer($server)->power($action);
+            } catch (Exception $exception) {
                 $this->output->error(trans('command/messages.server.power.action_failed', [
                     'name' => $server->name,
                     'id' => $server->id,
@@ -81,6 +72,8 @@ class BulkPowerActionCommand extends Command
 
             $bar->advance();
             $bar->display();
+
+            return null;
         });
 
         $this->line('');
@@ -88,6 +81,9 @@ class BulkPowerActionCommand extends Command
 
     /**
      * Returns the query builder instance that will return the servers that should be affected.
+     *
+     * @param  string[]|int[]  $servers
+     * @param  string[]|int[]  $nodes
      */
     protected function getQueryBuilder(array $servers, array $nodes): Builder
     {
@@ -97,7 +93,7 @@ class BulkPowerActionCommand extends Command
             $instance->whereIn('id', $servers)->orWhereIn('node_id', $nodes);
         } elseif (empty($nodes) && !empty($servers)) {
             $instance->whereIn('id', $servers);
-        } elseif (!empty($nodes) && empty($servers)) {
+        } elseif (!empty($nodes)) {
             $instance->whereIn('node_id', $nodes);
         }
 

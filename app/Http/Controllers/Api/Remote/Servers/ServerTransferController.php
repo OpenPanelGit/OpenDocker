@@ -1,18 +1,18 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Remote\Servers;
+namespace App\Http\Controllers\Api\Remote\Servers;
 
-use Illuminate\Http\Response;
-use Illuminate\Http\JsonResponse;
-use Pterodactyl\Models\Allocation;
-use Illuminate\Support\Facades\Log;
-use Pterodactyl\Models\ServerTransfer;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\Remote\ServerRequest;
+use App\Models\Allocation;
+use App\Models\Server;
+use App\Repositories\Daemon\DaemonServerRepository;
 use Illuminate\Database\ConnectionInterface;
-use Pterodactyl\Http\Controllers\Controller;
-use Pterodactyl\Repositories\Eloquent\ServerRepository;
-use Pterodactyl\Repositories\Wings\DaemonServerRepository;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
-use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Throwable;
 
 class ServerTransferController extends Controller
 {
@@ -21,51 +21,59 @@ class ServerTransferController extends Controller
      */
     public function __construct(
         private ConnectionInterface $connection,
-        private ServerRepository $repository,
         private DaemonServerRepository $daemonServerRepository,
-    ) {
-    }
+    ) {}
 
     /**
      * The daemon notifies us about a transfer failure.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
-    public function failure(string $uuid): JsonResponse
+    public function failure(ServerRequest $request, Server $server): JsonResponse
     {
-        $server = $this->repository->getByUuid($uuid);
         $transfer = $server->transfer;
         if (is_null($transfer)) {
             throw new ConflictHttpException('Server is not being transferred.');
         }
 
-        return $this->processFailedTransfer($transfer);
+        $this->connection->transaction(function () use ($transfer) {
+            $transfer->forceFill(['successful' => false])->saveOrFail();
+
+            if ($transfer->new_allocation || $transfer->new_additional_allocations) {
+                $allocations = array_merge([$transfer->new_allocation], $transfer->new_additional_allocations);
+                Allocation::query()->whereIn('id', $allocations)->update(['server_id' => null]);
+            }
+        });
+
+        return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
     /**
      * The daemon notifies us about a transfer success.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
-    public function success(string $uuid): JsonResponse
+    public function success(ServerRequest $request, Server $server): JsonResponse
     {
-        $server = $this->repository->getByUuid($uuid);
         $transfer = $server->transfer;
         if (is_null($transfer)) {
             throw new ConflictHttpException('Server is not being transferred.');
         }
 
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var Server $server */
         $server = $this->connection->transaction(function () use ($server, $transfer) {
-            $allocations = array_merge([$transfer->old_allocation], $transfer->old_additional_allocations);
+            $data = [];
 
-            // Remove the old allocations for the server and re-assign the server to the new
-            // primary allocation and node.
-            Allocation::query()->whereIn('id', $allocations)->update(['server_id' => null]);
-            $server->update([
-                'allocation_id' => $transfer->new_allocation,
-                'node_id' => $transfer->new_node,
-            ]);
+            if ($transfer->old_allocation || $transfer->old_additional_allocations) {
+                $allocations = array_merge([$transfer->old_allocation], $transfer->old_additional_allocations);
+                // Remove the old allocations for the server and re-assign the server to the new
+                // primary allocation and node.
+                Allocation::query()->whereIn('id', $allocations)->update(['server_id' => null]);
+                $data['allocation_id'] = $transfer->new_allocation;
+            }
+
+            $data['node_id'] = $transfer->new_node;
+            $server->update($data);
 
             $server = $server->fresh();
             $server->transfer->update(['successful' => true]);
@@ -80,27 +88,9 @@ class ServerTransferController extends Controller
                 ->setServer($server)
                 ->setNode($transfer->oldNode)
                 ->delete();
-        } catch (DaemonConnectionException $exception) {
-            Log::warning($exception, ['transfer_id' => $server->transfer->id]);
+        } catch (ConnectionException $exception) {
+            logger()->warning($exception, ['transfer_id' => $server->transfer->id]);
         }
-
-        return new JsonResponse([], Response::HTTP_NO_CONTENT);
-    }
-
-    /**
-     * Release all the reserved allocations for this transfer and mark it as failed in
-     * the database.
-     *
-     * @throws \Throwable
-     */
-    protected function processFailedTransfer(ServerTransfer $transfer): JsonResponse
-    {
-        $this->connection->transaction(function () use (&$transfer) {
-            $transfer->forceFill(['successful' => false])->saveOrFail();
-
-            $allocations = array_merge([$transfer->new_allocation], $transfer->new_additional_allocations);
-            Allocation::query()->whereIn('id', $allocations)->update(['server_id' => null]);
-        });
 
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }

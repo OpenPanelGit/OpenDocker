@@ -1,15 +1,15 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application;
+namespace App\Http\Requests\Api\Application;
 
-use Webmozart\Assert\Assert;
-use Pterodactyl\Models\ApiKey;
-use Laravel\Sanctum\TransientToken;
-use Illuminate\Validation\Validator;
+use App\Exceptions\PanelException;
+use App\Models\ApiKey;
+use App\Services\Acl\Api\AdminAcl;
 use Illuminate\Database\Eloquent\Model;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
 use Illuminate\Foundation\Http\FormRequest;
-use Pterodactyl\Exceptions\PterodactylException;
+use Illuminate\Validation\Validator;
+use Laravel\Sanctum\TransientToken;
+use Webmozart\Assert\Assert;
 
 abstract class ApplicationApiRequest extends FormRequest
 {
@@ -29,29 +29,33 @@ abstract class ApplicationApiRequest extends FormRequest
      * Determine if the current user is authorized to perform
      * the requested action against the API.
      *
-     * @throws PterodactylException
+     * @throws PanelException
      */
     public function authorize(): bool
     {
         if (is_null($this->resource)) {
-            throw new PterodactylException('An ACL resource must be defined on API requests.');
+            throw new PanelException('An ACL resource must be defined on API requests.');
         }
 
+        /** @var TransientToken|ApiKey $token */
         $token = $this->user()->currentAccessToken();
+
         if ($token instanceof TransientToken) {
-            return true;
+            return match ($this->permission) {
+                default => false,
+                AdminAcl::READ => $this->user()->can('viewList ' . $this->resource) && $this->user()->can('view ' . $this->resource),
+                AdminAcl::WRITE => $this->user()->can('update ' . $this->resource),
+            };
         }
 
-        if ($token->key_type === ApiKey::TYPE_ACCOUNT) {
+        if ($this->user()->isRootAdmin() && $token->key_type === ApiKey::TYPE_ACCOUNT) {
             return true;
         }
 
         return AdminAcl::check($token, $this->resource, $this->permission);
     }
 
-    /**
-     * Default set of rules to apply to API requests.
-     */
+    /** @return array<string, string|string[]> */
     public function rules(): array
     {
         return [];
@@ -73,8 +77,7 @@ abstract class ApplicationApiRequest extends FormRequest
      *
      * @template T of \Illuminate\Database\Eloquent\Model
      *
-     * @param class-string<T> $expect
-     *
+     * @param  class-string<T>  $expect
      * @return T
      *
      * @noinspection PhpDocSignatureInspection

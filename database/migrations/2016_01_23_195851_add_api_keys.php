@@ -1,30 +1,29 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 
-class AddApiKeys extends Migration
+return new class extends Migration
 {
-  /**
-   * Run the migrations.
-   */
-  public function up(): void
-  {
-    Schema::create('api_keys', function (Blueprint $table) {
-      $table->increments('id');
-      $table->char('public', 16);
-      $table->text('secret');
-      $table->text('allowed_ips')->nullable();
-      $table->timestamps();
-    });
-  }
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('api_keys', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('public', 16)->nullable();
+            $table->text('secret');
+            $table->text('allowed_ips')->nullable();
+            $table->timestamps();
+        });
+    }
 
-  /**
-   * Reverse the migrations.
-   */
-  public function down(): void
-  {
-    Schema::dropIfExists('api_keys');
-  }
-}
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('api_keys');
+    }
+};

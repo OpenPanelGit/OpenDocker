@@ -1,28 +1,24 @@
 <?php
 
-namespace Pterodactyl\Services\Servers;
+namespace App\Services\Servers;
 
-use Illuminate\Support\Arr;
-use Pterodactyl\Models\User;
-use Illuminate\Support\Collection;
-use Pterodactyl\Models\EggVariable;
-use Illuminate\Validation\ValidationException;
-use Pterodactyl\Traits\Services\HasUserLevels;
+use App\Models\EggVariable;
+use App\Models\User;
+use App\Traits\Services\HasUserLevels;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class VariableValidatorService
 {
     use HasUserLevels;
 
-    /**
-     * VariableValidatorService constructor.
-     */
-    public function __construct(private ValidationFactory $validator)
-    {
-    }
+    public function __construct(private readonly ValidationFactory $validator) {}
 
     /**
-     * Validate all of the passed data against the given service option variables.
+     * Validate  passed data against the given egg variables.
+     *
+     * @param  array<array-key, ?string>  $fields
      *
      * @throws ValidationException
      */
@@ -35,20 +31,13 @@ class VariableValidatorService
             $query = $query->where('user_editable', true)->where('user_viewable', true);
         }
 
-        /** @var \Pterodactyl\Models\EggVariable[] $variables */
+        /** @var EggVariable[] $variables */
         $variables = $query->get();
 
         $data = $rules = $customAttributes = [];
         foreach ($variables as $variable) {
-            $value = Arr::get($fields, $variable->env_variable);
-            $data['environment'][$variable->env_variable] = $value;
-            
-            // Make rules nullable to handle empty environment variables, but don't duplicate if already nullable
-            $rules_string = $variable->rules;
-            if (!str_starts_with($rules_string, 'nullable')) {
-                $rules_string = 'nullable|' . $rules_string;
-            }
-            $rules['environment.' . $variable->env_variable] = $rules_string;
+            $data['environment'][$variable->env_variable] = $fields[$variable->env_variable] ?? $variable->default_value;
+            $rules['environment.' . $variable->env_variable] = $variable->rules;
             $customAttributes['environment.' . $variable->env_variable] = trans('validation.internal.variable_value', ['env' => $variable->name]);
         }
 

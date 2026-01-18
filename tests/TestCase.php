@@ -1,22 +1,28 @@
 <?php
 
-namespace Pterodactyl\Tests;
+namespace App\Tests;
 
+use App\Tests\Seeders\EggSeeder;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Exception;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Spatie\Permission\PermissionRegistrar;
 
 abstract class TestCase extends BaseTestCase
 {
     /**
      * Setup tests.
      */
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
         Carbon::setTestNow(Carbon::now());
         CarbonImmutable::setTestNow(Carbon::now());
+
+        // TODO: if unit tests suite, then force set DB_HOST=UNIT_NO_DB
+        // env('DB_DATABASE', 'UNIT_NO_DB');
 
         // Why, you ask? If we don't force this to false it is possible for certain exceptions
         // to show their error message properly in the integration test output, but not actually
@@ -26,8 +32,18 @@ abstract class TestCase extends BaseTestCase
         // "an error occurred" message), we can probably assume that the exception isn't one that
         // is recognized as being user viewable.
         config()->set('app.debug', false);
+        config()->set('panel.auth.2fa_required', 0);
 
         $this->setKnownUuidFactory();
+
+        $this->app->make(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        try {
+            $seeder = new EggSeeder();
+            $seeder->run();
+        } catch (Exception) {
+            // Don't fail all tests if the fixture/ seeder isn't present or import fails.
+        }
     }
 
     /**
@@ -35,6 +51,9 @@ abstract class TestCase extends BaseTestCase
      */
     protected function tearDown(): void
     {
+        restore_exception_handler();
+        restore_error_handler();
+
         parent::tearDown();
 
         Carbon::setTestNow();
@@ -42,7 +61,7 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Handles the known UUID handling in certain unit tests. Use the "KnownUuid" trait
+     * Handles the known UUID handling in certain unit tests. Use the "MocksUuid" trait
      * in order to enable this ability.
      */
     public function setKnownUuidFactory()

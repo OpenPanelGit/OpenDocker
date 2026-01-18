@@ -1,38 +1,41 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Services\Allocations;
+namespace App\Tests\Integration\Services\Allocations;
 
-use Pterodactyl\Models\Allocation;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
-use Pterodactyl\Services\Allocations\FindAssignableAllocationService;
-use Pterodactyl\Exceptions\Service\Allocation\AutoAllocationNotEnabledException;
-use Pterodactyl\Exceptions\Service\Allocation\NoAutoAllocationSpaceAvailableException;
+use App\Exceptions\Service\Allocation\AutoAllocationNotEnabledException;
+use App\Exceptions\Service\Allocation\NoAutoAllocationSpaceAvailableException;
+use App\Models\Allocation;
+use App\Services\Allocations\FindAssignableAllocationService;
+use App\Tests\Integration\IntegrationTestCase;
 
 class FindAssignableAllocationServiceTest extends IntegrationTestCase
 {
     /**
      * Setup tests.
      */
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
-        config()->set('pterodactyl.client_features.allocations.enabled', true);
-        config()->set('pterodactyl.client_features.allocations.range_start', 0);
-        config()->set('pterodactyl.client_features.allocations.range_end', 0);
+        config()->set('panel.client_features.allocations.enabled', true);
+        config()->set('panel.client_features.allocations.range_start', 0);
+        config()->set('panel.client_features.allocations.range_end', 0);
     }
 
     /**
      * Test that an unassigned allocation is preferred rather than creating an entirely new
      * allocation for the server.
      */
-    public function testExistingAllocationIsPreferred()
+    public function test_existing_allocation_is_preferred(): void
     {
         $server = $this->createServerModel();
+        config()->set('panel.client_features.allocations.range_start', 5000);
+        config()->set('panel.client_features.allocations.range_end', 5005);
 
         $created = Allocation::factory()->create([
             'node_id' => $server->node_id,
             'ip' => $server->allocation->ip,
+            'port' => 5005,
         ]);
 
         $response = $this->getService()->handle($server);
@@ -47,11 +50,11 @@ class FindAssignableAllocationServiceTest extends IntegrationTestCase
     /**
      * Test that a new allocation is created if there is not a free one available.
      */
-    public function testNewAllocationIsCreatedIfOneIsNotFound()
+    public function test_new_allocation_is_created_if_one_is_not_found(): void
     {
         $server = $this->createServerModel();
-        config()->set('pterodactyl.client_features.allocations.range_start', 5000);
-        config()->set('pterodactyl.client_features.allocations.range_end', 5005);
+        config()->set('panel.client_features.allocations.range_start', 5000);
+        config()->set('panel.client_features.allocations.range_end', 5005);
 
         $response = $this->getService()->handle($server);
         $this->assertSame($server->id, $response->server_id);
@@ -64,13 +67,13 @@ class FindAssignableAllocationServiceTest extends IntegrationTestCase
     /**
      * Test that a currently assigned port is never assigned to a server.
      */
-    public function testOnlyPortNotInUseIsCreated()
+    public function test_only_port_not_in_use_is_created(): void
     {
         $server = $this->createServerModel();
         $server2 = $this->createServerModel(['node_id' => $server->node_id]);
 
-        config()->set('pterodactyl.client_features.allocations.range_start', 5000);
-        config()->set('pterodactyl.client_features.allocations.range_end', 5001);
+        config()->set('panel.client_features.allocations.range_start', 5000);
+        config()->set('panel.client_features.allocations.range_end', 5001);
 
         Allocation::factory()->create([
             'server_id' => $server2->id,
@@ -83,14 +86,14 @@ class FindAssignableAllocationServiceTest extends IntegrationTestCase
         $this->assertSame(5001, $response->port);
     }
 
-    public function testExceptionIsThrownIfNoMoreAllocationsCanBeCreatedInRange()
+    public function test_exception_is_thrown_if_no_more_allocations_can_be_created_in_range(): void
     {
         $server = $this->createServerModel();
         $server2 = $this->createServerModel(['node_id' => $server->node_id]);
-        config()->set('pterodactyl.client_features.allocations.range_start', 5000);
-        config()->set('pterodactyl.client_features.allocations.range_end', 5005);
+        config()->set('panel.client_features.allocations.range_start', 5000);
+        config()->set('panel.client_features.allocations.range_end', 5005);
 
-        for ($i = 5000; $i <= 5005; ++$i) {
+        for ($i = 5000; $i <= 5005; $i++) {
             Allocation::factory()->create([
                 'ip' => $server->allocation->ip,
                 'port' => $i,
@@ -109,7 +112,7 @@ class FindAssignableAllocationServiceTest extends IntegrationTestCase
      * Test that we only auto-allocate from the current server's IP address space, and not a random
      * IP address available on that node.
      */
-    public function testExceptionIsThrownIfOnlyFreePortIsOnADifferentIp()
+    public function test_exception_is_thrown_if_only_free_port_is_on_a_different_ip(): void
     {
         $server = $this->createServerModel();
 
@@ -121,7 +124,7 @@ class FindAssignableAllocationServiceTest extends IntegrationTestCase
         $this->getService()->handle($server);
     }
 
-    public function testExceptionIsThrownIfStartOrEndRangeIsNotDefined()
+    public function test_exception_is_thrown_if_start_or_end_range_is_not_defined(): void
     {
         $server = $this->createServerModel();
 
@@ -131,11 +134,11 @@ class FindAssignableAllocationServiceTest extends IntegrationTestCase
         $this->getService()->handle($server);
     }
 
-    public function testExceptionIsThrownIfStartOrEndRangeIsNotNumeric()
+    public function test_exception_is_thrown_if_start_or_end_range_is_not_numeric(): void
     {
         $server = $this->createServerModel();
-        config()->set('pterodactyl.client_features.allocations.range_start', 'hodor');
-        config()->set('pterodactyl.client_features.allocations.range_end', 10);
+        config()->set('panel.client_features.allocations.range_start', 'hodor');
+        config()->set('panel.client_features.allocations.range_end', 10);
 
         try {
             $this->getService()->handle($server);
@@ -145,8 +148,8 @@ class FindAssignableAllocationServiceTest extends IntegrationTestCase
             $this->assertSame('Expected an integerish value. Got: string', $exception->getMessage());
         }
 
-        config()->set('pterodactyl.client_features.allocations.range_start', 10);
-        config()->set('pterodactyl.client_features.allocations.range_end', 'hodor');
+        config()->set('panel.client_features.allocations.range_start', 10);
+        config()->set('panel.client_features.allocations.range_end', 'hodor');
 
         try {
             $this->getService()->handle($server);
@@ -157,9 +160,9 @@ class FindAssignableAllocationServiceTest extends IntegrationTestCase
         }
     }
 
-    public function testExceptionIsThrownIfFeatureIsNotEnabled()
+    public function test_exception_is_thrown_if_feature_is_not_enabled(): void
     {
-        config()->set('pterodactyl.client_features.allocations.enabled', false);
+        config()->set('panel.client_features.allocations.enabled', false);
         $server = $this->createServerModel();
 
         $this->expectException(AutoAllocationNotEnabledException::class);

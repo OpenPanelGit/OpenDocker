@@ -1,19 +1,20 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\Schedule;
+namespace App\Tests\Integration\Api\Client\Server\Schedule;
 
+use App\Enums\SubuserPermission;
+use App\Models\Schedule;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Illuminate\Http\Response;
-use Pterodactyl\Models\Schedule;
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class CreateServerScheduleTest extends ClientApiIntegrationTestCase
 {
     /**
      * Test that a schedule can be created for the server.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('permissionsDataProvider')]
-    public function testScheduleCanBeCreatedForServer(array $permissions)
+    #[DataProvider('permissionsDataProvider')]
+    public function test_schedule_can_be_created_for_server(array $permissions): void
     {
         [$user, $server] = $this->generateTestAccount($permissions);
 
@@ -31,7 +32,7 @@ class CreateServerScheduleTest extends ClientApiIntegrationTestCase
 
         $this->assertNotNull($id = $response->json('attributes.id'));
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::query()->findOrFail($id);
         $this->assertFalse($schedule->is_active);
         $this->assertFalse($schedule->is_processing);
@@ -49,14 +50,14 @@ class CreateServerScheduleTest extends ClientApiIntegrationTestCase
     /**
      * Test that the validation rules for scheduling work as expected.
      */
-    public function testScheduleValidationRules()
+    public function test_schedule_validation_rules(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
         $response = $this->actingAs($user)->postJson("/api/client/servers/$server->uuid/schedules", []);
 
         $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
-        foreach (['name', 'minute', 'hour', 'day_of_month', 'day_of_week'] as $i => $field) {
+        foreach (['name', 'minute', 'hour', 'day_of_month', 'month', 'day_of_week'] as $i => $field) {
             $response->assertJsonPath("errors.$i.code", 'ValidationException');
             $response->assertJsonPath("errors.$i.meta.rule", 'required');
             $response->assertJsonPath("errors.$i.meta.source_field", $field);
@@ -66,6 +67,7 @@ class CreateServerScheduleTest extends ClientApiIntegrationTestCase
             ->postJson("/api/client/servers/$server->uuid/schedules", [
                 'name' => 'Testing',
                 'is_active' => 'no',
+                'only_when_online' => 'false',
                 'minute' => '*',
                 'hour' => '*',
                 'day_of_month' => '*',
@@ -79,9 +81,9 @@ class CreateServerScheduleTest extends ClientApiIntegrationTestCase
     /**
      * Test that a subuser without required permissions cannot create a schedule.
      */
-    public function testSubuserCannotCreateScheduleWithoutPermissions()
+    public function test_subuser_cannot_create_schedule_without_permissions(): void
     {
-        [$user, $server] = $this->generateTestAccount([Permission::ACTION_SCHEDULE_UPDATE]);
+        [$user, $server] = $this->generateTestAccount([SubuserPermission::ScheduleUpdate]);
 
         $this->actingAs($user)
             ->postJson("/api/client/servers/$server->uuid/schedules", [])
@@ -90,6 +92,6 @@ class CreateServerScheduleTest extends ClientApiIntegrationTestCase
 
     public static function permissionsDataProvider(): array
     {
-        return [[[]], [[Permission::ACTION_SCHEDULE_CREATE]]];
+        return [[[]], [[SubuserPermission::ScheduleCreate]]];
     }
 }

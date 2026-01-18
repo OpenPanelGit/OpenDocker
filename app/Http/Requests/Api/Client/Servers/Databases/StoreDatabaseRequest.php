@@ -1,22 +1,22 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Databases;
+namespace App\Http\Requests\Api\Client\Servers\Databases;
 
-use Webmozart\Assert\Assert;
-use Pterodactyl\Models\Server;
-use Illuminate\Validation\Rule;
-use Pterodactyl\Models\Database;
-use Pterodactyl\Models\Permission;
+use App\Contracts\Http\ClientPermissionsRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
+use App\Models\Database;
+use App\Models\Server;
+use App\Services\Databases\DatabaseManagementService;
 use Illuminate\Database\Query\Builder;
-use Pterodactyl\Contracts\Http\ClientPermissionsRequest;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
-use Pterodactyl\Services\Databases\DatabaseManagementService;
+use Illuminate\Validation\Rule;
+use Webmozart\Assert\Assert;
 
 class StoreDatabaseRequest extends ClientApiRequest implements ClientPermissionsRequest
 {
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_DATABASE_CREATE;
+        return SubuserPermission::DatabaseCreate;
     }
 
     public function rules(): array
@@ -43,6 +43,9 @@ class StoreDatabaseRequest extends ClientApiRequest implements ClientPermissions
         ];
     }
 
+    /**
+     * @return array<array-key, string>
+     */
     public function messages(): array
     {
         return [

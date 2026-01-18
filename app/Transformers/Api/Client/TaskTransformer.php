@@ -1,20 +1,23 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Client;
+namespace App\Transformers\Api\Client;
 
-use Pterodactyl\Models\Task;
+use App\Models\Task;
 
 class TaskTransformer extends BaseClientTransformer
 {
+    /**
+     * {@inheritdoc}
+     */
     public function getResourceName(): string
     {
         return Task::RESOURCE_NAME;
     }
 
     /**
-     * Transforms a schedule's task into a client viewable format.
+     * @param  Task  $model
      */
-    public function transform(Task $model): array
+    public function transform($model): array
     {
         return [
             'id' => $model->id,

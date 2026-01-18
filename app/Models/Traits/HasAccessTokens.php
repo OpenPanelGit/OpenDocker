@@ -1,16 +1,16 @@
 <?php
 
-namespace Pterodactyl\Models\Traits;
+namespace App\Models\Traits;
 
-use Illuminate\Support\Str;
-use Laravel\Sanctum\Sanctum;
-use Pterodactyl\Models\ApiKey;
-use Laravel\Sanctum\HasApiTokens;
+use App\Extensions\Laravel\Sanctum\NewAccessToken;
+use App\Models\ApiKey;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Pterodactyl\Extensions\Laravel\Sanctum\NewAccessToken;
+use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\Sanctum;
 
 /**
- * @mixin \Pterodactyl\Models\Model
+ * @mixin \App\Models\Model
  */
 trait HasAccessTokens
 {
@@ -24,6 +24,9 @@ trait HasAccessTokens
         return $this->hasMany(Sanctum::$personalAccessTokenModel);
     }
 
+    /**
+     * @param  ?string[]  $ips
+     */
     public function createToken(?string $memo, ?array $ips): NewAccessToken
     {
         /** @var ApiKey $token */
@@ -31,7 +34,7 @@ trait HasAccessTokens
             'user_id' => $this->id,
             'key_type' => ApiKey::TYPE_ACCOUNT,
             'identifier' => ApiKey::generateTokenIdentifier(ApiKey::TYPE_ACCOUNT),
-            'token' => encrypt($plain = Str::random(ApiKey::KEY_LENGTH)),
+            'token' => $plain = Str::random(ApiKey::KEY_LENGTH),
             'memo' => $memo ?? '',
             'allowed_ips' => $ips ?? [],
         ]);

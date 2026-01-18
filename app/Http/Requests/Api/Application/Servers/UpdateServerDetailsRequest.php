@@ -1,8 +1,8 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Servers;
+namespace App\Http\Requests\Api\Application\Servers;
 
-use Pterodactyl\Models\Server;
+use App\Models\Server;
 
 class UpdateServerDetailsRequest extends ServerWriteRequest
 {
@@ -11,7 +11,7 @@ class UpdateServerDetailsRequest extends ServerWriteRequest
      */
     public function rules(): array
     {
-        $rules = Server::getRulesForUpdate($this->parameter('server', Server::class));
+        $rules = $this->route() ? Server::getRulesForUpdate($this->parameter('server', Server::class)) : Server::getRules();
 
         return [
             'external_id' => $rules['external_id'],
@@ -22,8 +22,9 @@ class UpdateServerDetailsRequest extends ServerWriteRequest
     }
 
     /**
-     * Convert the posted data into the correct format that is expected
-     * by the application.
+     * Convert the posted data into the correct format that is expected by the application.
+     *
+     * @return array<array-key, string>
      */
     public function validated($key = null, $default = null): array
     {
@@ -38,6 +39,8 @@ class UpdateServerDetailsRequest extends ServerWriteRequest
     /**
      * Rename some attributes in error messages to clarify the field
      * being discussed.
+     *
+     * @return array<array-key, string>
      */
     public function attributes(): array
     {

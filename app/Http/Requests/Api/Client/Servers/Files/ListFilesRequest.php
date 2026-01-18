@@ -1,9 +1,9 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Files;
+namespace App\Http\Requests\Api\Client\Servers\Files;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
 
 class ListFilesRequest extends ClientApiRequest
 {
@@ -11,9 +11,9 @@ class ListFilesRequest extends ClientApiRequest
      * Check that the user making this request to the API is authorized to list all
      * the files that exist for a given server.
      */
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_FILE_READ;
+        return SubuserPermission::FileRead;
     }
 
     public function rules(): array

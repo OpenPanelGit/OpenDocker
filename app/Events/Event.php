@@ -1,7 +1,5 @@
 <?php
 
-namespace Pterodactyl\Events;
+namespace App\Events;
 
-abstract class Event
-{
-}
+abstract class Event {}

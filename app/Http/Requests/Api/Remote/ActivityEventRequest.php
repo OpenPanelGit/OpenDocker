@@ -1,9 +1,9 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Remote;
+namespace App\Http\Requests\Api\Remote;
 
-use Illuminate\Support\Collection;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Collection;
 
 class ActivityEventRequest extends FormRequest
 {
@@ -12,6 +12,9 @@ class ActivityEventRequest extends FormRequest
         return true;
     }
 
+    /**
+     * @return array<array-key, string|string[]>
+     */
     public function rules(): array
     {
         return [
@@ -28,6 +31,8 @@ class ActivityEventRequest extends FormRequest
 
     /**
      * Returns all the unique server UUIDs that were received in this request.
+     *
+     * @return string[]
      */
     public function servers(): array
     {
@@ -36,6 +41,8 @@ class ActivityEventRequest extends FormRequest
 
     /**
      * Returns all the unique user UUIDs that were submitted in this request.
+     *
+     * @return string[]
      */
     public function users(): array
     {

@@ -1,21 +1,27 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Application\Servers;
+namespace App\Http\Controllers\Api\Application\Servers;
 
-use Illuminate\Http\Response;
-use Pterodactyl\Models\Server;
+use App\Exceptions\DisplayException;
+use App\Exceptions\Model\DataValidationException;
+use App\Exceptions\Service\Deployment\NoViableAllocationException;
+use App\Http\Controllers\Api\Application\ApplicationApiController;
+use App\Http\Requests\Api\Application\Servers\GetServerRequest;
+use App\Http\Requests\Api\Application\Servers\GetServersRequest;
+use App\Http\Requests\Api\Application\Servers\ServerWriteRequest;
+use App\Http\Requests\Api\Application\Servers\StoreServerRequest;
+use App\Models\Server;
+use App\Services\Servers\ServerCreationService;
+use App\Services\Servers\ServerDeletionService;
+use App\Transformers\Api\Application\ServerTransformer;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\QueryBuilder;
-use Pterodactyl\Services\Servers\ServerCreationService;
-use Pterodactyl\Services\Servers\ServerDeletionService;
-use Pterodactyl\Transformers\Api\Application\ServerTransformer;
-use Pterodactyl\Http\Requests\Api\Application\Servers\GetServerRequest;
-use Pterodactyl\Http\Requests\Api\Application\Servers\GetServersRequest;
-use Pterodactyl\Http\Requests\Api\Application\Servers\ServerWriteRequest;
-use Pterodactyl\Http\Requests\Api\Application\Servers\StoreServerRequest;
-use Pterodactyl\Http\Controllers\Api\Application\ApplicationApiController;
-use Illuminate\Support\Facades\Log;
+use Throwable;
 
+#[Group('Server', weight: 0)]
 class ServerController extends ApplicationApiController
 {
     /**
@@ -23,18 +29,22 @@ class ServerController extends ApplicationApiController
      */
     public function __construct(
         private ServerCreationService $creationService,
-        private ServerDeletionService $deletionService,
+        private ServerDeletionService $deletionService
     ) {
         parent::__construct();
     }
 
     /**
+     * List servers
+     *
      * Return all the servers that currently exist on the Panel.
+     *
+     * @return array<array-key, mixed>
      */
     public function index(GetServersRequest $request): array
     {
-        $servers = QueryBuilder::for(Server::query())
-            ->allowedFilters(['uuid', 'uuidShort', 'name', 'description', 'image', 'external_id'])
+        $servers = QueryBuilder::for(Server::class)
+            ->allowedFilters(['uuid', 'uuid_short', 'name', 'description', 'image', 'external_id'])
             ->allowedSorts(['id', 'uuid'])
             ->paginate($request->query('per_page') ?? 50);
 
@@ -44,15 +54,15 @@ class ServerController extends ApplicationApiController
     }
 
     /**
+     * Create server
+     *
      * Create a new server on the system.
      *
-     * @throws \Throwable
-     * @throws \Illuminate\Validation\ValidationException
-     * @throws \Pterodactyl\Exceptions\DisplayException
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
-     * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException
-     * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableNodeException
+     * @throws Throwable
+     * @throws ValidationException
+     * @throws DisplayException
+     * @throws DataValidationException
+     * @throws NoViableAllocationException
      */
     public function store(StoreServerRequest $request): JsonResponse
     {
@@ -64,7 +74,11 @@ class ServerController extends ApplicationApiController
     }
 
     /**
+     * View server
+     *
      * Show a single server transformed for the application API.
+     *
+     * @return array<array-key, mixed>
      */
     public function view(GetServerRequest $request, Server $server): array
     {
@@ -74,9 +88,11 @@ class ServerController extends ApplicationApiController
     }
 
     /**
+     * Delete server
+     *
      * Deletes a server.
      *
-     * @throws \Pterodactyl\Exceptions\DisplayException
+     * @throws DisplayException
      */
     public function delete(ServerWriteRequest $request, Server $server, string $force = ''): Response
     {

@@ -1,22 +1,23 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\Startup;
+namespace App\Tests\Integration\Api\Client\Server\Startup;
 
-use Pterodactyl\Models\User;
+use App\Enums\SubuserPermission;
+use App\Models\EggVariable;
+use App\Models\User;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Illuminate\Http\Response;
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Models\EggVariable;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class UpdateStartupVariableTest extends ClientApiIntegrationTestCase
 {
     /**
      * Test that a startup variable can be edited successfully for a server.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('permissionsDataProvider')]
-    public function testStartupVariableCanBeUpdated(array $permissions)
+    #[DataProvider('permissionsDataProvider')]
+    public function test_startup_variable_can_be_updated(array $permissions): void
     {
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount($permissions);
         $server->fill([
             'startup' => 'java {{SERVER_JARFILE}} --version {{BUNGEE_VERSION}}',
@@ -38,7 +39,7 @@ class UpdateStartupVariableTest extends ClientApiIntegrationTestCase
 
         $response->assertOk();
         $response->assertJsonPath('object', EggVariable::RESOURCE_NAME);
-        $this->assertJsonTransformedWith($response->json('attributes'), $server->variables[0]);
+        $this->assertJsonTransformedWith($response->json('attributes'), $server->variables->firstWhere('env_variable', 'BUNGEE_VERSION'));
         $response->assertJsonPath('meta.startup_command', 'java bungeecord.jar --version 123');
         $response->assertJsonPath('meta.raw_startup_command', $server->startup);
     }
@@ -47,10 +48,10 @@ class UpdateStartupVariableTest extends ClientApiIntegrationTestCase
      * Test that variables that are either not user_viewable, or not user_editable, cannot be
      * updated via this endpoint.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('permissionsDataProvider')]
-    public function testStartupVariableCannotBeUpdatedIfNotUserViewableOrEditable(array $permissions)
+    #[DataProvider('permissionsDataProvider')]
+    public function test_startup_variable_cannot_be_updated_if_not_user_viewable_or_editable(array $permissions): void
     {
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount($permissions);
 
         $egg = $this->cloneEggAndVariables($server->egg);
@@ -83,13 +84,13 @@ class UpdateStartupVariableTest extends ClientApiIntegrationTestCase
      * Test that a hidden variable is not included in the startup_command output for the server if
      * a different variable is updated.
      */
-    public function testHiddenVariablesAreNotReturnedInStartupCommandWhenUpdatingVariable()
+    public function test_hidden_variables_are_not_returned_in_startup_command_when_updating_variable(): void
     {
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount();
 
         $egg = $this->cloneEggAndVariables($server->egg);
-        $egg->variables()->first()->update(['user_viewable' => false]);
+        $egg->variables()->firstWhere('env_variable', 'BUNGEE_VERSION')->update(['user_viewable' => false]);
 
         $server->fill([
             'egg_id' => $egg->id,
@@ -111,16 +112,14 @@ class UpdateStartupVariableTest extends ClientApiIntegrationTestCase
     /**
      * Test that an egg variable with a validation rule of 'nullable|string' works if no value
      * is passed through in the request.
-     *
-     * @see https://github.com/pterodactyl/panel/issues/2433
      */
-    public function testEggVariableWithNullableStringIsNotRequired()
+    public function test_egg_variable_with_nullable_string_is_not_required(): void
     {
-        /** @var \Pterodactyl\Models\Server $server */
+        /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount();
 
         $egg = $this->cloneEggAndVariables($server->egg);
-        $egg->variables()->first()->update(['rules' => 'nullable|string']);
+        $egg->variables()->firstWhere('env_variable', 'BUNGEE_VERSION')->update(['rules' => ['nullable', 'string']]);
 
         $server->fill(['egg_id' => $egg->id])->save();
         $server->refresh();
@@ -138,9 +137,9 @@ class UpdateStartupVariableTest extends ClientApiIntegrationTestCase
      * Test that a variable cannot be updated if the user does not have permission to perform
      * that action, or they aren't assigned at all to the server.
      */
-    public function testStartupVariableCannotBeUpdatedIfNotUserViewable()
+    public function test_startup_variable_cannot_be_updated_if_not_user_viewable(): void
     {
-        [$user, $server] = $this->generateTestAccount([Permission::ACTION_WEBSOCKET_CONNECT]);
+        [$user, $server] = $this->generateTestAccount([SubuserPermission::WebsocketConnect]);
         $this->actingAs($user)->putJson($this->link($server) . '/startup/variable')->assertForbidden();
 
         $user2 = User::factory()->create();
@@ -149,6 +148,6 @@ class UpdateStartupVariableTest extends ClientApiIntegrationTestCase
 
     public static function permissionsDataProvider(): array
     {
-        return [[[]], [[Permission::ACTION_STARTUP_UPDATE]]];
+        return [[[]], [[SubuserPermission::StartupUpdate]]];
     }
 }

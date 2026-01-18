@@ -1,8 +1,8 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\Overrides;
+namespace App\Console\Commands\Overrides;
 
-use Pterodactyl\Console\RequiresDatabaseMigrations;
+use App\Traits\Commands\RequiresDatabaseMigrations;
 use Illuminate\Foundation\Console\UpCommand as BaseUpCommand;
 
 class UpCommand extends BaseUpCommand
@@ -21,6 +21,6 @@ class UpCommand extends BaseUpCommand
             return 1;
         }
 
-        return parent::handle() ?? 0;
+        return parent::handle();
     }
 }

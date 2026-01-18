@@ -1,11 +1,12 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\Schedule;
+namespace App\Tests\Integration\Api\Client\Server\Schedule;
 
-use Pterodactyl\Models\Schedule;
-use Pterodactyl\Helpers\Utilities;
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use App\Enums\SubuserPermission;
+use App\Helpers\Utilities;
+use App\Models\Schedule;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class UpdateServerScheduleTest extends ClientApiIntegrationTestCase
 {
@@ -25,12 +26,12 @@ class UpdateServerScheduleTest extends ClientApiIntegrationTestCase
     /**
      * Test that a schedule can be updated.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('permissionsDataProvider')]
-    public function testScheduleCanBeUpdated(array $permissions)
+    #[DataProvider('permissionsDataProvider')]
+    public function test_schedule_can_be_updated(array $permissions): void
     {
         [$user, $server] = $this->generateTestAccount($permissions);
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
         $expected = Utilities::getScheduleNextRunDate('5', '*', '*', '*', '*');
 
@@ -51,7 +52,7 @@ class UpdateServerScheduleTest extends ClientApiIntegrationTestCase
      * Test that an error is returned if the schedule exists but does not belong to this
      * specific server instance.
      */
-    public function testErrorIsReturnedIfScheduleDoesNotBelongToServer()
+    public function test_error_is_returned_if_schedule_does_not_belong_to_server(): void
     {
         [$user, $server] = $this->generateTestAccount();
         $server2 = $this->createServerModel(['owner_id' => $user->id]);
@@ -67,9 +68,9 @@ class UpdateServerScheduleTest extends ClientApiIntegrationTestCase
      * Test that an error is returned if the subuser does not have permission to modify a
      * server schedule.
      */
-    public function testErrorIsReturnedIfSubuserDoesNotHavePermissionToModifySchedule()
+    public function test_error_is_returned_if_subuser_does_not_have_permission_to_modify_schedule(): void
     {
-        [$user, $server] = $this->generateTestAccount([Permission::ACTION_SCHEDULE_CREATE]);
+        [$user, $server] = $this->generateTestAccount([SubuserPermission::ScheduleCreate]);
 
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
 
@@ -81,14 +82,12 @@ class UpdateServerScheduleTest extends ClientApiIntegrationTestCase
     /**
      * Test that the "is_processing" field gets reset to false when the schedule is enabled
      * or disabled so that an invalid state can be more easily fixed.
-     *
-     * @see https://github.com/pterodactyl/panel/issues/2425
      */
-    public function testScheduleIsProcessingIsSetToFalseWhenActiveStateChanges()
+    public function test_schedule_is_processing_is_set_to_false_when_active_state_changes(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create([
             'server_id' => $server->id,
             'is_active' => true,
@@ -110,6 +109,6 @@ class UpdateServerScheduleTest extends ClientApiIntegrationTestCase
 
     public static function permissionsDataProvider(): array
     {
-        return [[[]], [[Permission::ACTION_SCHEDULE_UPDATE]]];
+        return [[[]], [[SubuserPermission::ScheduleUpdate]]];
     }
 }

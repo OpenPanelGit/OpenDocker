@@ -1,79 +1,60 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Remote\Servers;
+namespace App\Http\Controllers\Api\Remote\Servers;
 
-use Carbon\CarbonImmutable;
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Pterodactyl\Models\Server;
+use App\Enums\ServerState;
+use App\Events\Server\Installed as ServerInstalled;
+use App\Exceptions\Model\DataValidationException;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\Remote\InstallationDataRequest;
+use App\Http\Requests\Api\Remote\ServerRequest;
+use App\Models\Server;
 use Illuminate\Http\JsonResponse;
-use Pterodactyl\Http\Controllers\Controller;
-use Pterodactyl\Repositories\Eloquent\ServerRepository;
-use Pterodactyl\Events\Server\Installed as ServerInstalled;
-use Illuminate\Contracts\Events\Dispatcher as EventDispatcher;
-use Pterodactyl\Http\Requests\Api\Remote\InstallationDataRequest;
+use Illuminate\Http\Response;
 
 class ServerInstallController extends Controller
 {
     /**
-     * ServerInstallController constructor.
-     */
-    public function __construct(private ServerRepository $repository, private EventDispatcher $eventDispatcher)
-    {
-    }
-
-    /**
      * Returns installation information for a server.
-     *
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      */
-    public function index(Request $request, string $uuid): JsonResponse
+    public function index(ServerRequest $request, Server $server): JsonResponse
     {
-        $server = $this->repository->getByUuid($uuid);
-        $egg = $server->egg;
-
         return new JsonResponse([
-            'container_image' => $egg->copy_script_container,
-            'entrypoint' => $egg->copy_script_entry,
-            'script' => $egg->copy_script_install,
+            'container_image' => $server->egg->copy_script_container,
+            'entrypoint' => $server->egg->copy_script_entry,
+            'script' => $server->egg->copy_script_install,
         ]);
     }
 
     /**
      * Updates the installation state of a server.
      *
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
+     * @throws DataValidationException
      */
-    public function store(InstallationDataRequest $request, string $uuid): JsonResponse
+    public function store(InstallationDataRequest $request, Server $server): JsonResponse
     {
-        $server = $this->repository->getByUuid($uuid);
         $status = null;
 
-        // Make sure the type of failure is accurate
-        if (!$request->boolean('successful')) {
-            $status = Server::STATUS_INSTALL_FAILED;
+        $successful = $request->boolean('successful');
 
-            if ($request->boolean('reinstall')) {
-                $status = Server::STATUS_REINSTALL_FAILED;
-            }
+        // Make sure the type of failure is accurate
+        if (!$successful) {
+            $status = $request->boolean('reinstall') ? ServerState::ReinstallFailed : ServerState::InstallFailed;
         }
 
         // Keep the server suspended if it's already suspended
-        if ($server->status === Server::STATUS_SUSPENDED) {
-            $status = Server::STATUS_SUSPENDED;
+        if ($server->status === ServerState::Suspended) {
+            $status = ServerState::Suspended;
         }
 
-        $this->repository->update($server->id, ['status' => $status, 'installed_at' => CarbonImmutable::now()], true, true);
+        $previouslyInstalledAt = $server->installed_at;
 
-        // If the server successfully installed, fire installed event.
-        // This logic allows individually disabling install and reinstall notifications separately.
-        $isInitialInstall = is_null($server->installed_at);
-        if ($isInitialInstall && config()->get('pterodactyl.email.send_install_notification', true)) {
-            $this->eventDispatcher->dispatch(new ServerInstalled($server));
-        } elseif (!$isInitialInstall && config()->get('pterodactyl.email.send_reinstall_notification', true)) {
-            $this->eventDispatcher->dispatch(new ServerInstalled($server));
-        }
+        $server->status = $status;
+        $server->installed_at = now();
+        $server->save();
+
+        $isInitialInstall = is_null($previouslyInstalledAt);
+        event(new ServerInstalled($server, $successful, $isInitialInstall));
 
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }

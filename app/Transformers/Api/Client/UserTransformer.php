@@ -1,9 +1,9 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Client;
+namespace App\Transformers\Api\Client;
 
+use App\Models\User;
 use Illuminate\Support\Str;
-use Pterodactyl\Models\User;
 
 class UserTransformer extends BaseClientTransformer
 {
@@ -16,18 +16,23 @@ class UserTransformer extends BaseClientTransformer
     }
 
     /**
-     * Transforms a User model into a representation that can be shown to regular
-     * users of the API.
+     * @param  User  $user
+     *
+     * {@inheritdoc}
      */
-    public function transform(User $model): array
+    public function transform($user): array
     {
         return [
-            'uuid' => $model->uuid,
-            'username' => $model->username,
-            'email' => $model->email,
-            'image' => 'https://gravatar.com/avatar/' . md5(Str::lower($model->email)),
-            '2fa_enabled' => $model->use_totp,
-            'created_at' => $model->created_at->toAtomString(),
+            'uuid' => $user->uuid,
+            'username' => $user->username,
+            'email' => $user->email,
+            'language' => $user->language,
+            'image' => 'https://gravatar.com/avatar/' . md5(Str::lower($user->email)), // deprecated
+            'admin' => $user->isRootAdmin(), // deprecated, use "root_admin"
+            'root_admin' => $user->isRootAdmin(),
+            '2fa_enabled' => filled($user->mfa_app_secret),
+            'created_at' => $this->formatTimestamp($user->created_at),
+            'updated_at' => $this->formatTimestamp($user->updated_at),
         ];
     }
 }

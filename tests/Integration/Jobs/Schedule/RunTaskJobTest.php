@@ -1,38 +1,37 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Jobs\Schedule;
+namespace App\Tests\Integration\Jobs\Schedule;
 
+use App\Enums\ServerState;
+use App\Jobs\Schedule\RunTaskJob;
+use App\Models\Schedule;
+use App\Models\Server;
+use App\Models\Task;
+use App\Repositories\Daemon\DaemonServerRepository;
+use App\Tests\Integration\IntegrationTestCase;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
-use GuzzleHttp\Psr7\Request;
-use Pterodactyl\Models\Task;
-use GuzzleHttp\Psr7\Response;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Schedule;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
-use Pterodactyl\Jobs\Schedule\RunTaskJob;
-use GuzzleHttp\Exception\BadResponseException;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
-use Pterodactyl\Repositories\Wings\DaemonPowerRepository;
-use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class RunTaskJobTest extends IntegrationTestCase
 {
     /**
      * An inactive job should not be run by the system.
      */
-    public function testInactiveJobIsNotRun()
+    public function test_inactive_job_is_not_run(): void
     {
         $server = $this->createServerModel();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create([
             'server_id' => $server->id,
             'is_processing' => true,
             'last_run_at' => null,
             'is_active' => false,
         ]);
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task = Task::factory()->create(['schedule_id' => $schedule->id, 'is_queued' => true]);
 
         $job = new RunTaskJob($task);
@@ -48,13 +47,13 @@ class RunTaskJobTest extends IntegrationTestCase
         $this->assertTrue(CarbonImmutable::now()->isSameAs(\DateTimeInterface::ATOM, $schedule->last_run_at));
     }
 
-    public function testJobWithInvalidActionThrowsException()
+    public function test_job_with_invalid_action_throws_exception(): void
     {
         $server = $this->createServerModel();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task = Task::factory()->create(['schedule_id' => $schedule->id, 'action' => 'foobar']);
 
         $job = new RunTaskJob($task);
@@ -64,34 +63,34 @@ class RunTaskJobTest extends IntegrationTestCase
         Bus::dispatchSync($job);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('isManualRunDataProvider')]
-    public function testJobIsExecuted(bool $isManualRun)
+    #[DataProvider('isManualRunDataProvider')]
+    public function test_job_is_executed(bool $isManualRun): void
     {
         $server = $this->createServerModel();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create([
             'server_id' => $server->id,
             'is_active' => !$isManualRun,
             'is_processing' => true,
             'last_run_at' => null,
         ]);
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task = Task::factory()->create([
             'schedule_id' => $schedule->id,
-            'action' => Task::ACTION_POWER,
+            'action' => 'power',
             'payload' => 'start',
             'is_queued' => true,
             'continue_on_failure' => false,
         ]);
 
-        $mock = \Mockery::mock(DaemonPowerRepository::class);
-        $this->instance(DaemonPowerRepository::class, $mock);
+        $mock = \Mockery::mock(DaemonServerRepository::class);
+        $this->instance(DaemonServerRepository::class, $mock);
 
         $mock->expects('setServer')->with(\Mockery::on(function ($value) use ($server) {
             return $value instanceof Server && $value->id === $server->id;
         }))->andReturnSelf();
-        $mock->expects('send')->with('start')->andReturn(new Response());
+        $mock->expects('power')->with('start');
 
         Bus::dispatchSync(new RunTaskJob($task, $isManualRun));
 
@@ -103,30 +102,28 @@ class RunTaskJobTest extends IntegrationTestCase
         $this->assertTrue(CarbonImmutable::now()->isSameAs(\DateTimeInterface::ATOM, $schedule->last_run_at));
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('isManualRunDataProvider')]
-    public function testExceptionDuringRunIsHandledCorrectly(bool $continueOnFailure)
+    #[DataProvider('isManualRunDataProvider')]
+    public function test_exception_during_run_is_handled_correctly(bool $continueOnFailure): void
     {
         $server = $this->createServerModel();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task = Task::factory()->create([
             'schedule_id' => $schedule->id,
-            'action' => Task::ACTION_POWER,
+            'action' => 'power',
             'payload' => 'start',
             'continue_on_failure' => $continueOnFailure,
         ]);
 
-        $mock = \Mockery::mock(DaemonPowerRepository::class);
-        $this->instance(DaemonPowerRepository::class, $mock);
+        $mock = \Mockery::mock(DaemonServerRepository::class);
+        $this->instance(DaemonServerRepository::class, $mock);
 
-        $mock->expects('setServer->send')->andThrow(
-            new DaemonConnectionException(new BadResponseException('Bad request', new Request('GET', '/test'), new Response()))
-        );
+        $mock->expects('setServer->power')->andThrow(new ConnectionException());
 
         if (!$continueOnFailure) {
-            $this->expectException(DaemonConnectionException::class);
+            $this->expectException(ConnectionException::class);
         }
 
         Bus::dispatchSync(new RunTaskJob($task));
@@ -143,13 +140,11 @@ class RunTaskJobTest extends IntegrationTestCase
 
     /**
      * Test that a schedule is not executed if the server is suspended.
-     *
-     * @see https://github.com/pterodactyl/panel/issues/4008
      */
-    public function testTaskIsNotRunIfServerIsSuspended()
+    public function test_task_is_not_run_if_server_is_suspended(): void
     {
         $server = $this->createServerModel([
-            'status' => Server::STATUS_SUSPENDED,
+            'status' => ServerState::Suspended,
         ]);
 
         $schedule = Schedule::factory()->for($server)->create([
@@ -157,7 +152,7 @@ class RunTaskJobTest extends IntegrationTestCase
         ]);
 
         $task = Task::factory()->for($schedule)->create([
-            'action' => Task::ACTION_POWER,
+            'action' => 'power',
             'payload' => 'start',
         ]);
 

@@ -1,31 +1,32 @@
 <?php
 
-namespace Pterodactyl\Models;
+namespace App\Models;
 
-use Symfony\Component\Yaml\Yaml;
-use Illuminate\Container\Container;
-use Illuminate\Support\Facades\Log;
-use Pterodactyl\Enums\Daemon\DaemonType;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Contracts\Encryption\Encrypter;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Contracts\Validatable;
+use App\Exceptions\Service\HasActiveServersException;
+use App\Repositories\Daemon\DaemonSystemRepository;
+use App\Traits\HasValidation;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Pterodactyl\Contracts\Daemon\Daemon as DaemonInterface;
-use Pterodactyl\Http\Controllers\Admin\NodeAutoDeployController;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * @property int $id
  * @property string $uuid
  * @property bool $public
- * @property bool $trust_alias
  * @property string $name
  * @property string|null $description
- * @property int $location_id
  * @property string $fqdn
- * @property string|null $internal_fqdn
- * @property bool $use_separate_fqdns
  * @property string $scheme
  * @property bool $behind_proxy
  * @property bool $maintenance_mode
@@ -33,41 +34,43 @@ use Pterodactyl\Http\Controllers\Admin\NodeAutoDeployController;
  * @property int $memory_overallocate
  * @property int $disk
  * @property int $disk_overallocate
+ * @property int $cpu
+ * @property int $cpu_overallocate
  * @property int $upload_size
  * @property string $daemon_token_id
  * @property string $daemon_token
- * @property int $daemonListen
- * @property int $daemonSFTP
- * @property string $daemonBase
- * @property string $daemonType
- * @property string $backupDisk
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
- * @property Location $location
- * @property \Pterodactyl\Models\Mount[]|\Illuminate\Database\Eloquent\Collection $mounts
- * @property \Pterodactyl\Models\Server[]|\Illuminate\Database\Eloquent\Collection $servers
- * @property \Pterodactyl\Models\Allocation[]|\Illuminate\Database\Eloquent\Collection $allocations
+ * @property int $daemon_listen
+ * @property int $daemon_connect
+ * @property int $daemon_sftp
+ * @property string|null $daemon_sftp_alias
+ * @property string $daemon_base
+ * @property string[] $tags
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ * @property Mount[]|Collection $mounts
+ * @property int|null $mounts_count
+ * @property Server[]|Collection $servers
+ * @property int|null $servers_count
+ * @property Allocation[]|Collection $allocations
+ * @property int|null $allocations_count
+ * @property Role[]|Collection $roles
+ * @property int|null $roles_count
  */
-
-class Node extends Model
+class Node extends Model implements Validatable
 {
-    /** @use HasFactory<\Database\Factories\NodeFactory> */
     use HasFactory;
+    use HasValidation;
     use Notifiable;
 
     /**
      * The resource name for this model when it is transformed into an
-     * API representation using fractal.
+     * API representation using fractal. Also used as name for api key permissions.
      */
     public const RESOURCE_NAME = 'node';
 
     public const DAEMON_TOKEN_ID_LENGTH = 16;
-    public const DAEMON_TOKEN_LENGTH = 64;
 
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'nodes';
+    public const DAEMON_TOKEN_LENGTH = 64;
 
     /**
      * The attributes excluded from the model's JSON form.
@@ -75,73 +78,40 @@ class Node extends Model
     protected $hidden = ['daemon_token_id', 'daemon_token'];
 
     /**
-     * Cast values to correct type.
-     */
-    protected $casts = [
-        'location_id' => 'integer',
-        'memory' => 'integer',
-        'disk' => 'integer',
-        'daemonListen' => 'integer',
-        'daemonSFTP' => 'integer',
-        'behind_proxy' => 'boolean',
-        'public' => 'boolean',
-        'trust_alias' => 'boolean',
-        'maintenance_mode' => 'boolean',
-        'use_separate_fqdns' => 'boolean',
-    ];
-
-    /**
      * Fields that are mass assignable.
      */
     protected $fillable = [
-        'uuid',
-        'public',
-        'trust_alias',
-        'name',
-        'location_id',
-        'fqdn',
-        'internal_fqdn',
-        'use_separate_fqdns',
-        'scheme',
-        'behind_proxy',
-        'memory',
-        'memory_overallocate',
-        'disk',
-        'disk_overallocate',
-        'upload_size',
-        'daemonBase',
-        'daemonSFTP',
-        'daemonListen',
-        'daemon_token_id',
-        'daemon_token',
-        'description',
-        'maintenance_mode',
-        'daemonType',
-        'backupDisk'
+        'public', 'name',
+        'fqdn', 'scheme', 'behind_proxy',
+        'memory', 'memory_overallocate', 'disk',
+        'disk_overallocate', 'cpu', 'cpu_overallocate',
+        'upload_size', 'daemon_base',
+        'daemon_sftp', 'daemon_sftp_alias', 'daemon_listen', 'daemon_connect',
+        'description', 'maintenance_mode', 'tags',
     ];
 
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'name' => 'required|regex:/^([\w .-]{1,100})$/',
-        'description' => 'string|nullable',
-        'location_id' => 'required|exists:locations,id',
-        'public' => 'boolean',
-        'trust_alias' => 'boolean',
-        'fqdn' => 'required|string',
-        'internal_fqdn' => 'nullable|string',
-        'use_separate_fqdns' => 'sometimes|boolean',
-        'scheme' => 'required',
-        'behind_proxy' => 'boolean',
-        'memory' => 'required|numeric|min:1',
-        'memory_overallocate' => 'required|numeric|min:-1',
-        'disk' => 'required|numeric|min:1',
-        'disk_overallocate' => 'required|numeric|min:-1',
-        'daemonBase' => 'sometimes|required|regex:/^([\/][\d\w.\-\/]+)$/',
-        'daemonSFTP' => 'required|numeric|between:1,65535',
-        'daemonListen' => 'required|numeric|between:1,65535',
-        'maintenance_mode' => 'boolean',
-        'upload_size' => 'int|between:1,1024',
-        'daemonType' => 'required|string',
-        'backupDisk' => 'required|string'
+        'name' => ['required', 'string', 'min:1', 'max:100'],
+        'description' => ['string', 'nullable'],
+        'public' => ['boolean'],
+        'fqdn' => ['required', 'string', 'notIn:0.0.0.0,127.0.0.1,localhost'],
+        'scheme' => ['required', 'string', 'in:http,https'],
+        'behind_proxy' => ['boolean'],
+        'memory' => ['required', 'numeric', 'min:0'],
+        'memory_overallocate' => ['required', 'numeric', 'min:-1'],
+        'disk' => ['required', 'numeric', 'min:0'],
+        'disk_overallocate' => ['required', 'numeric', 'min:-1'],
+        'cpu' => ['required', 'numeric', 'min:0'],
+        'cpu_overallocate' => ['required', 'numeric', 'min:-1'],
+        'daemon_base' => ['sometimes', 'required', 'regex:/^([\/][\d\w.\-\/]+)$/'],
+        'daemon_sftp' => ['required', 'numeric', 'between:1,65535'],
+        'daemon_sftp_alias' => ['nullable', 'string'],
+        'daemon_listen' => ['required', 'numeric', 'between:1,65535'],
+        'daemon_connect' => ['required', 'numeric', 'between:1,65535'],
+        'maintenance_mode' => ['boolean'],
+        'upload_size' => ['int', 'min:1'],
+        'tags' => ['array'],
     ];
 
     /**
@@ -149,83 +119,112 @@ class Node extends Model
      */
     protected $attributes = [
         'public' => true,
-        'trust_alias' => false,
         'behind_proxy' => false,
+        'memory' => 0,
         'memory_overallocate' => 0,
+        'disk' => 0,
         'disk_overallocate' => 0,
-        'daemonBase' => '/var/lib/pterodactyl/volumes',
-        'daemonSFTP' => 2022,
-        'daemonListen' => 8080,
+        'cpu' => 0,
+        'cpu_overallocate' => 0,
+        'daemon_base' => '/var/lib/pelican/volumes',
+        'daemon_sftp' => 2022,
+        'daemon_listen' => 8080,
+        'daemon_connect' => 8080,
         'maintenance_mode' => false,
-        'use_separate_fqdns' => false,
+        'tags' => '[]',
     ];
 
-
-    private function getDaemonImplementation(): DaemonInterface
+    protected function casts(): array
     {
-        $implementations = DaemonType::allClass();
-
-        $daemonType = strtolower($this->daemonType);
-
-        if (!isset($implementations[$daemonType])) {
-
-            return new \Pterodactyl\Models\Daemons\Elytra();
-        }
-
-        $implementationClass = $implementations[$daemonType];
-        return new $implementationClass();
+        return [
+            'memory' => 'integer',
+            'disk' => 'integer',
+            'cpu' => 'integer',
+            'daemon_listen' => 'integer',
+            'daemon_connect' => 'integer',
+            'daemon_sftp' => 'integer',
+            'daemon_token' => 'encrypted',
+            'behind_proxy' => 'boolean',
+            'public' => 'boolean',
+            'maintenance_mode' => 'boolean',
+            'tags' => 'array',
+        ];
     }
 
+    public int $servers_sum_memory = 0;
+
+    public int $servers_sum_disk = 0;
+
+    public int $servers_sum_cpu = 0;
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $node) {
+            $node->uuid = Str::uuid();
+            $node->daemon_token = Str::random(self::DAEMON_TOKEN_LENGTH);
+            $node->daemon_token_id = Str::random(self::DAEMON_TOKEN_ID_LENGTH);
+
+            return true;
+        });
+
+        static::deleting(function (self $node) {
+            throw_if($node->servers()->count(), new HasActiveServersException(trans('exceptions.egg.delete_has_servers')));
+        });
+    }
 
     /**
      * Get the connection address to use when making calls to this node.
-     * This will use the internal FQDN if separate FQDNs are enabled and internal_fqdn is set,
-     * otherwise it will fall back to the regular fqdn.
      */
     public function getConnectionAddress(): string
     {
-        $fqdn = $this->getInternalFqdn();
-        return sprintf('%s://%s:%s', $this->scheme, $fqdn, $this->daemonListen);
-    }
-
-    /**
-     * Get the browser connection address for WebSocket connections.
-     * This always uses the public fqdn field.
-     */
-    public function getBrowserConnectionAddress(): string
-    {
-        return sprintf('%s://%s:%s', $this->scheme, $this->fqdn, $this->daemonListen);
-    }
-
-    /**
-     * Get the appropriate FQDN for internal panel-to-Wings communication.
-     */
-    public function getInternalFqdn(): string
-    {
-        // Use internal FQDN if it's provided and not empty
-        if (!empty($this->internal_fqdn)) {
-            return $this->internal_fqdn;
-        }
-
-        return $this->fqdn;
+        return "$this->scheme://$this->fqdn:$this->daemon_connect";
     }
 
     /**
      * Returns the configuration as an array.
+     *
+     * @return array{
+     *     debug: bool,
+     *     uuid: string,
+     *     token_id: string,
+     *     token: string,
+     *     api: array{
+     *         host: string,
+     *         port: int,
+     *         ssl: array{enabled: bool, cert: string, key: string},
+     *         upload_limit: int
+     *     },
+     *     system: array{data: string, sftp: array{bind_port: int}},
+     *     allowed_mounts: string[],
+     *     remote: string,
+     * }
      */
     public function getConfiguration(): array
     {
-        $daemon = $this->getDaemonImplementation();
-        return $daemon->getConfiguration($this);
-    }
-
-    /**
-     * Returns the auto deploy command as a string.
-     */
-    public function getAutoDeploy(string $token): string
-    {
-        $daemon = $this->getDaemonImplementation();
-        return $daemon->getAutoDeploy($this, $token);
+        return [
+            'debug' => false,
+            'uuid' => $this->uuid,
+            'token_id' => $this->daemon_token_id,
+            'token' => $this->daemon_token,
+            'api' => [
+                'host' => '0.0.0.0',
+                'port' => $this->daemon_listen,
+                'ssl' => [
+                    'enabled' => (!$this->behind_proxy && $this->scheme === 'https'),
+                    'cert' => '/etc/letsencrypt/live/' . Str::lower($this->fqdn) . '/fullchain.pem',
+                    'key' => '/etc/letsencrypt/live/' . Str::lower($this->fqdn) . '/privkey.pem',
+                ],
+                'upload_limit' => $this->upload_size,
+            ],
+            'system' => [
+                'data' => $this->daemon_base,
+                'sftp' => [
+                    'bind_port' => $this->daemon_sftp,
+                ],
+            ],
+            'allowed_mounts' => $this->mounts->pluck('source')->toArray(),
+            'remote' => config('app.url'),
+        ];
     }
 
     /**
@@ -244,32 +243,14 @@ class Node extends Model
         return json_encode($this->getConfiguration(), $pretty ? JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT : JSON_UNESCAPED_SLASHES);
     }
 
-    /**
-     * Helper function to return the decrypted key for a node.
-     */
-    public function getDecryptedKey(): string
-    {
-        return (string) Container::getInstance()->make(Encrypter::class)->decrypt(
-            $this->daemon_token
-        );
-    }
-
     public function isUnderMaintenance(): bool
     {
         return $this->maintenance_mode;
     }
 
-    public function mounts(): HasManyThrough
+    public function mounts(): MorphToMany
     {
-        return $this->hasManyThrough(Mount::class, MountNode::class, 'node_id', 'id', 'id', 'mount_id');
-    }
-
-    /**
-     * Gets the location associated with a node.
-     */
-    public function location(): BelongsTo
-    {
-        return $this->belongsTo(Location::class);
+        return $this->morphToMany(Mount::class, 'mountable');
     }
 
     /**
@@ -289,17 +270,135 @@ class Node extends Model
     }
 
     /**
+     * @return BelongsToMany<DatabaseHost, $this>
+     */
+    public function databaseHosts(): BelongsToMany
+    {
+        return $this->belongsToMany(DatabaseHost::class);
+    }
+
+    public function roles(): HasManyThrough
+    {
+        return $this->hasManyThrough(Role::class, NodeRole::class, 'node_id', 'id', 'id', 'role_id');
+    }
+
+    /**
      * Returns a boolean if the node is viable for an additional server to be placed on it.
      */
-    public function isViable(int $memory, int $disk): bool
+    public function isViable(int $memory, int $disk, int $cpu): bool
     {
-        $memoryLimit = $this->memory * (1 + ($this->memory_overallocate / 100));
-        $diskLimit = $this->disk * (1 + ($this->disk_overallocate / 100));
+        if ($this->memory > 0 && $this->memory_overallocate >= 0) {
+            $memoryLimit = $this->memory * (1 + ($this->memory_overallocate / 100));
+            if ($this->servers_sum_memory + $memory > $memoryLimit) {
+                return false;
+            }
+        }
 
-        // Calculate used resources excluding servers marked for exclusion
-        $usedMemory = $this->servers()->where('exclude_from_resource_calculation', false)->sum('memory');
-        $usedDisk = $this->servers()->where('exclude_from_resource_calculation', false)->sum('disk');
+        if ($this->disk > 0 && $this->disk_overallocate >= 0) {
+            $diskLimit = $this->disk * (1 + ($this->disk_overallocate / 100));
+            if ($this->servers_sum_disk + $disk > $diskLimit) {
+                return false;
+            }
+        }
 
-        return ($usedMemory + $memory) <= $memoryLimit && ($usedDisk + $disk) <= $diskLimit;
+        if ($this->cpu > 0 && $this->cpu_overallocate >= 0) {
+            $cpuLimit = $this->cpu * (1 + ($this->cpu_overallocate / 100));
+            if ($this->servers_sum_cpu + $cpu > $cpuLimit) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return array<mixed> */
+    public function systemInformation(): array
+    {
+        return cache()->remember("nodes.$this->id.system_information", now()->addSeconds(360), function () {
+            try {
+                return (new DaemonSystemRepository())
+                    ->setNode($this)
+                    ->getSystemInformation();
+            } catch (Exception $exception) {
+                $message = str($exception->getMessage());
+
+                if ($message->startsWith('cURL error 6: Could not resolve host')) {
+                    $message = str('Could not resolve host');
+                }
+
+                if ($message->startsWith('cURL error 28: Failed to connect to ')) {
+                    $message = $message->after('cURL error 28: ')->before(' after ');
+                }
+
+                return ['exception' => $message->toString()];
+            }
+        });
+    }
+
+    /** @return array{
+     *     memory_total: int, memory_used: int,
+     *     swap_total: int, swap_used: int,
+     *     load_average1: float, load_average5: float, load_average15: float,
+     *     cpu_percent: float,
+     *     disk_total: int, disk_used: int,
+     * }
+     */
+    public function statistics(): array
+    {
+        $default = [
+            'memory_total' => 0,
+            'memory_used' => 0,
+            'swap_total' => 0,
+            'swap_used' => 0,
+            'load_average1' => 0.00,
+            'load_average5' => 0.00,
+            'load_average15' => 0.00,
+            'cpu_percent' => 0.00,
+            'disk_total' => 0,
+            'disk_used' => 0,
+        ];
+
+        return cache()->remember("nodes.$this->id.statistics", now()->addSeconds(360), function () use ($default) {
+            try {
+
+                $data = Http::daemon($this)
+                    ->connectTimeout(1)
+                    ->timeout(1)
+                    ->get('/api/system/utilization')
+                    ->json();
+
+                if (!empty($data['memory_total'])) {
+                    return $data;
+                }
+            } catch (Exception) {
+            }
+
+            return $default;
+        });
+    }
+
+    /** @return string[] */
+    public function ipAddresses(): array
+    {
+        return cache()->remember("nodes.$this->id.ips", now()->addHour(), function () {
+            $ips = collect();
+
+            try {
+                $addresses = Http::daemon($this)->connectTimeout(1)->timeout(1)->get('/api/system/ips')->json();
+                $ips = $ips->concat(fluent($addresses)->get('ip_addresses'));
+            } catch (Exception) {
+                if (is_ip($this->fqdn)) {
+                    $ips->push($this->fqdn);
+                }
+            }
+
+            $ips = $ips->filter(fn (string $ip) => is_ip($ip));
+
+            // TODO: remove later
+            $ips->push('0.0.0.0');
+            $ips->push('::');
+
+            return $ips->unique()->all();
+        });
     }
 }

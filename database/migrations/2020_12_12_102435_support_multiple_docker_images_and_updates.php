@@ -1,58 +1,51 @@
 <?php
 
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Database\Migrations\Migration;
 
-class SupportMultipleDockerImagesAndUpdates extends Migration
+return new class extends Migration
 {
-  /**
-   * Run the migrations.
-   */
-  public function up(): void
-  {
-    Schema::table('eggs', function (Blueprint $table) {
-      $table->json('docker_images')->after('docker_image')->nullable();
-      $table->text('update_url')->after('docker_images')->nullable();
-    });
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('eggs', function (Blueprint $table) {
+            $table->json('docker_images')->after('docker_image')->nullable();
+            $table->text('update_url')->after('docker_images')->nullable();
+        });
 
-    switch (DB::getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME)) {
-      case 'mysql':
-        DB::table('eggs')->update(['docker_images' => DB::raw('JSON_ARRAY(docker_image)')]);
-        break;
-      case 'pgsql':
-        DB::table('eggs')->update(['docker_images' => DB::raw('jsonb_build_array(docker_image)')]);
-        break;
+        Schema::table('eggs', function (Blueprint $table) {
+            if (Schema::getConnection()->getDriverName() === 'pgsql') {
+                DB::statement('UPDATE eggs SET docker_images = json_build_array(docker_image)');
+            } else {
+                DB::statement('UPDATE eggs SET docker_images = JSON_ARRAY(docker_image)');
+            }
+        });
+
+        Schema::table('eggs', function (Blueprint $table) {
+            $table->dropColumn('docker_image');
+        });
     }
 
-    Schema::table('eggs', function (Blueprint $table) {
-      $table->dropColumn('docker_image');
-    });
-  }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('eggs', function (Blueprint $table) {
+            $table->text('docker_image')->after('docker_images');
+        });
 
-  /**
-   * Reverse the migrations.
-   */
-  public function down(): void
-  {
-    Schema::table('eggs', function (Blueprint $table) {
-      $table->text('docker_image')->after('docker_images');
-    });
+        Schema::table('eggs', function (Blueprint $table) {
+            DB::statement('UPDATE eggs SET docker_image = JSON_UNQUOTE(JSON_EXTRACT(docker_images, "$[0]"))');
+        });
 
-    switch (DB::getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME)) {
-      case 'mysql':
-        DB::table('eggs')->update(['docker_images' => DB::raw('JSON_UNQUOTE(JSON_EXTRACT(docker_images, "$[0]")')]);
-        break;
-      case 'pgsql':
-        DB::table('eggs')->update(['docker_images' => DB::raw('JSON_UNQUOTE(JSON_EXTRACT(docker_images, "$[0]")')]);
-        DB::table('eggs')->update(['docker_images' => DB::raw('docker_images->>0')]);
-        break;
+        Schema::table('eggs', function (Blueprint $table) {
+            $table->dropColumn('docker_images');
+            $table->dropColumn('update_url');
+        });
     }
-
-    Schema::table('eggs', function (Blueprint $table) {
-      $table->dropColumn('docker_images');
-      $table->dropColumn('update_url');
-    });
-  }
-}
+};

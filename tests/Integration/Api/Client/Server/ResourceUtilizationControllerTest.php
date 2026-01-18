@@ -1,22 +1,22 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server;
+namespace App\Tests\Integration\Api\Client\Server;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Repositories\Wings\DaemonServerRepository;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use App\Enums\SubuserPermission;
+use App\Repositories\Daemon\DaemonServerRepository;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 
 class ResourceUtilizationControllerTest extends ClientApiIntegrationTestCase
 {
     /**
      * Test that the resource utilization for a server is returned in the expected format.
      */
-    public function testServerResourceUtilizationIsReturned()
+    public function test_server_resource_utilization_is_returned(): void
     {
         $service = \Mockery::mock(DaemonServerRepository::class);
         $this->app->instance(DaemonServerRepository::class, $service);
 
-        [$user, $server] = $this->generateTestAccount([Permission::ACTION_WEBSOCKET_CONNECT]);
+        [$user, $server] = $this->generateTestAccount([SubuserPermission::WebsocketConnect]);
 
         $service->expects('setServer')->with(\Mockery::on(function ($value) use ($server) {
             return $server->uuid === $value->uuid;

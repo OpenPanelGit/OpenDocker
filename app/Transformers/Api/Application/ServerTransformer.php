@@ -1,13 +1,17 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Application;
+namespace App\Transformers\Api\Application;
 
-use Pterodactyl\Models\Server;
-use League\Fractal\Resource\Item;
+use App\Models\Allocation;
+use App\Models\Database;
+use App\Models\Egg;
+use App\Models\Node;
+use App\Models\Server;
+use App\Models\User;
+use App\Services\Servers\EnvironmentService;
 use League\Fractal\Resource\Collection;
+use League\Fractal\Resource\Item;
 use League\Fractal\Resource\NullResource;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Pterodactyl\Services\Servers\EnvironmentService;
 
 class ServerTransformer extends BaseTransformer
 {
@@ -20,10 +24,8 @@ class ServerTransformer extends BaseTransformer
         'allocations',
         'user',
         'subusers',
-        'nest',
         'egg',
         'variables',
-        'location',
         'node',
         'databases',
         'transfer',
@@ -32,7 +34,7 @@ class ServerTransformer extends BaseTransformer
     /**
      * Perform dependency injection.
      */
-    public function handle(EnvironmentService $environmentService)
+    public function handle(EnvironmentService $environmentService): void
     {
         $this->environmentService = $environmentService;
     }
@@ -46,15 +48,15 @@ class ServerTransformer extends BaseTransformer
     }
 
     /**
-     * Return a generic transformed server array.
+     * @param  Server  $server
      */
-    public function transform(Server $server): array
+    public function transform($server): array
     {
         return [
             'id' => $server->getKey(),
             'external_id' => $server->external_id,
             'uuid' => $server->uuid,
-            'identifier' => $server->uuidShort,
+            'identifier' => $server->uuid_short,
             'name' => $server->name,
             'description' => $server->description,
             'status' => $server->status,
@@ -62,25 +64,23 @@ class ServerTransformer extends BaseTransformer
             'suspended' => $server->isSuspended(),
             'limits' => [
                 'memory' => $server->memory,
-                'overhead_memory' => $server->overhead_memory,
                 'swap' => $server->swap,
                 'disk' => $server->disk,
                 'io' => $server->io,
                 'cpu' => $server->cpu,
                 'threads' => $server->threads,
-                'oom_disabled' => $server->oom_disabled,
-                'exclude_from_resource_calculation' => $server->exclude_from_resource_calculation,
+                // This field is deprecated, please use "oom_killer".
+                'oom_disabled' => !$server->oom_killer,
+                'oom_killer' => $server->oom_killer,
             ],
             'feature_limits' => [
                 'databases' => $server->database_limit,
                 'allocations' => $server->allocation_limit,
                 'backups' => $server->backup_limit,
-                'backup_storage_mb' => $server->backup_storage_limit,
             ],
             'user' => $server->owner_id,
             'node' => $server->node_id,
             'allocation' => $server->allocation_id,
-            'nest' => $server->nest_id,
             'egg' => $server->egg_id,
             'container' => [
                 'startup_command' => $server->startup,
@@ -96,12 +96,10 @@ class ServerTransformer extends BaseTransformer
 
     /**
      * Return a generic array of allocations for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeAllocations(Server $server): Collection|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_ALLOCATIONS)) {
+        if (!$this->authorize(Allocation::RESOURCE_NAME)) {
             return $this->null();
         }
 
@@ -112,12 +110,10 @@ class ServerTransformer extends BaseTransformer
 
     /**
      * Return a generic array of data about subusers for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeSubusers(Server $server): Collection|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_USERS)) {
+        if (!$this->authorize(User::RESOURCE_NAME)) {
             return $this->null();
         }
 
@@ -128,12 +124,10 @@ class ServerTransformer extends BaseTransformer
 
     /**
      * Return a generic array of data about subusers for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeUser(Server $server): Item|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_USERS)) {
+        if (!$this->authorize(User::RESOURCE_NAME)) {
             return $this->null();
         }
 
@@ -143,29 +137,11 @@ class ServerTransformer extends BaseTransformer
     }
 
     /**
-     * Return a generic array with nest information for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
-     */
-    public function includeNest(Server $server): Item|NullResource
-    {
-        if (!$this->authorize(AdminAcl::RESOURCE_NESTS)) {
-            return $this->null();
-        }
-
-        $server->loadMissing('nest');
-
-        return $this->item($server->getRelation('nest'), $this->makeTransformer(NestTransformer::class), 'nest');
-    }
-
-    /**
      * Return a generic array with egg information for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeEgg(Server $server): Item|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_EGGS)) {
+        if (!$this->authorize(Egg::RESOURCE_NAME)) {
             return $this->null();
         }
 
@@ -176,12 +152,10 @@ class ServerTransformer extends BaseTransformer
 
     /**
      * Return a generic array of data about subusers for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeVariables(Server $server): Collection|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_SERVERS)) {
+        if (!$this->authorize(Server::RESOURCE_NAME)) {
             return $this->null();
         }
 
@@ -191,29 +165,11 @@ class ServerTransformer extends BaseTransformer
     }
 
     /**
-     * Return a generic array with location information for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
-     */
-    public function includeLocation(Server $server): Item|NullResource
-    {
-        if (!$this->authorize(AdminAcl::RESOURCE_LOCATIONS)) {
-            return $this->null();
-        }
-
-        $server->loadMissing('location');
-
-        return $this->item($server->getRelation('location'), $this->makeTransformer(LocationTransformer::class), 'location');
-    }
-
-    /**
      * Return a generic array with node information for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeNode(Server $server): Item|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_NODES)) {
+        if (!$this->authorize(Node::RESOURCE_NAME)) {
             return $this->null();
         }
 
@@ -224,12 +180,10 @@ class ServerTransformer extends BaseTransformer
 
     /**
      * Return a generic array with database information for this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeDatabases(Server $server): Collection|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_SERVER_DATABASES)) {
+        if (!$this->authorize(Database::RESOURCE_NAME)) {
             return $this->null();
         }
 

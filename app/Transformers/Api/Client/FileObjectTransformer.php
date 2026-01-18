@@ -1,6 +1,6 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Client;
+namespace App\Transformers\Api\Client;
 
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
@@ -8,9 +8,19 @@ use Illuminate\Support\Arr;
 class FileObjectTransformer extends BaseClientTransformer
 {
     /**
-     * Transform a file object response from the daemon into a standardized response.
+     * @param array{
+     *     name: string,
+     *     mode: string,
+     *     mode_bits: mixed,
+     *     size: int,
+     *     file: bool,
+     *     symlink: bool,
+     *     mime: string,
+     *     created: mixed,
+     *     modified: mixed,
+     * } $item
      */
-    public function transform(array $item): array
+    public function transform($item): array
     {
         return [
             'name' => Arr::get($item, 'name'),

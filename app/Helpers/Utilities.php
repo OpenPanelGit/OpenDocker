@@ -1,10 +1,11 @@
 <?php
 
-namespace Pterodactyl\Helpers;
+namespace App\Helpers;
 
 use Carbon\Carbon;
 use Cron\CronExpression;
-use Illuminate\Support\Facades\Log;
+use Exception;
+use Illuminate\Support\Str;
 use Illuminate\Support\ViewErrorBag;
 
 class Utilities
@@ -15,18 +16,18 @@ class Utilities
      */
     public static function randomStringWithSpecialCharacters(int $length = 16): string
     {
-        $string = str_random($length);
+        $string = Str::random($length);
         // Given a random string of characters, randomly loop through the characters and replace some
         // with special characters to avoid issues with MySQL password requirements on some servers.
         try {
-            for ($i = 0; $i < random_int(2, 6); ++$i) {
+            for ($i = 0; $i < random_int(2, 6); $i++) {
                 $character = ['!', '@', '=', '.', '+', '^'][random_int(0, 5)];
 
                 $string = substr_replace($string, $character, random_int(0, $length - 1), 1);
             }
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             // Just log the error and hope for the best at this point.
-            Log::error($exception);
+            logger()->error($exception);
         }
 
         return $string;
@@ -35,13 +36,13 @@ class Utilities
     /**
      * Converts schedule cron data into a carbon object.
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public static function getScheduleNextRunDate(string $minute, string $hour, string $dayOfMonth, string $month, string $dayOfWeek): Carbon
     {
         return Carbon::instance((new CronExpression(
             sprintf('%s %s %s %s %s', $minute, $hour, $dayOfMonth, $month, $dayOfWeek)
-        ))->getNextRunDate());
+        ))->getNextRunDate(now('UTC')));
     }
 
     public static function checked(string $name, mixed $default): string

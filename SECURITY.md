@@ -1,9 +1,18 @@
 # Security Policy
 
+## Supported Versions
+
+While Pelican is in beta, we only provide security fixes for the most recent beta release. Older beta releases are unsupported.  
+![](https://img.shields.io/github/v/release/pelican-dev/panel?label=latest-release)
+
 ## Reporting a Vulnerability
 
-Please email `security@pyrodactyl.dev`.
+Please report any vulnerabilities via _one_ of the following methods:
 
-We make every effort to respond as soon as possible, although it may take a day or two for us to sync internally and determine the severity of the report and its impact. Please, _do not_ use a public facing channel or GitHub issues to report sensitive security issues.
+- [Create a security advisory on GitHub](https://github.com/pelican-dev/panel/security/advisories/new)
+- Send an e-mail to <team@pelican.dev>
 
-As part of our process, we will create a security advisory for the affected versions and disclose it publicly, usually two to four weeks after a releasing a version that addresses it.
+Include steps to reproduce, affected versions, impact, and a proof of concept if available.
+
+You can expect a response within 72 hours.  
+Please do not disclose vulnerabilities publicly until we have released a fix. We will acknowledge receipt and can credit researchers upon request.

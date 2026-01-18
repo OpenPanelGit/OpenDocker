@@ -1,13 +1,14 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Nodes;
+namespace App\Http\Requests\Api\Application\Nodes;
 
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Pterodactyl\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Models\Node;
+use App\Services\Acl\Api\AdminAcl;
 
 class GetNodesRequest extends ApplicationApiRequest
 {
-    protected ?string $resource = AdminAcl::RESOURCE_NODES;
+    protected ?string $resource = Node::RESOURCE_NAME;
 
     protected int $permission = AdminAcl::READ;
 }

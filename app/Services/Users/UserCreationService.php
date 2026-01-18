@@ -1,33 +1,34 @@
 <?php
 
-namespace Pterodactyl\Services\Users;
+namespace App\Services\Users;
 
-use Ramsey\Uuid\Uuid;
-use Pterodactyl\Models\User;
+use App\Exceptions\Model\DataValidationException;
+use App\Models\Role;
+use App\Models\User;
+use App\Notifications\AccountCreated;
+use Exception;
+use Filament\Facades\Filament;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Contracts\Auth\PasswordBroker;
-use Pterodactyl\Notifications\AccountCreated;
-use Pterodactyl\Contracts\Repository\UserRepositoryInterface;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class UserCreationService
 {
-    /**
-     * UserCreationService constructor.
-     */
     public function __construct(
-        private ConnectionInterface $connection,
-        private Hasher $hasher,
-        private PasswordBroker $passwordBroker,
-        private UserRepositoryInterface $repository,
-    ) {
-    }
+        private readonly ConnectionInterface $connection,
+        private readonly Hasher $hasher,
+    ) {}
 
     /**
      * Create a new user on the system.
      *
-     * @throws \Exception
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
+     * @param  array<array-key, mixed>  $data
+     *
+     * @throws Exception
+     * @throws DataValidationException
      */
     public function handle(array $data): User
     {
@@ -36,22 +37,42 @@ class UserCreationService
         }
 
         $this->connection->beginTransaction();
-        if (!isset($data['password']) || empty($data['password'])) {
+        if (empty($data['password'])) {
             $generateResetToken = true;
-            $data['password'] = $this->hasher->make(str_random(30));
+            $data['password'] = $this->hasher->make(Str::random(30));
         }
 
+        $isRootAdmin = array_key_exists('root_admin', $data) && $data['root_admin'];
+        unset($data['root_admin']);
+
+        if (empty($data['username'])) {
+            $data['username'] = str($data['email'])->before('@')->toString() . Str::random(3);
+        }
+
+        $data['username'] = str($data['username'])
+            ->replace(['.', '-'], '')
+            ->ascii()
+            ->substr(0, 64)
+            ->toString();
+
         /** @var User $user */
-        $user = $this->repository->create(array_merge($data, [
+        $user = User::query()->forceCreate(array_merge($data, [
             'uuid' => Uuid::uuid4()->toString(),
-        ]), true, true);
+        ]));
+
+        if ($isRootAdmin) {
+            $user->syncRoles(Role::getRootAdmin());
+        }
 
         if (isset($generateResetToken)) {
-            $token = $this->passwordBroker->createToken($user);
+            /** @var PasswordBroker $broker */
+            $broker = Password::broker(Filament::getPanel('app')->getAuthPasswordBroker());
+            $token = $broker->createToken($user);
         }
 
         $this->connection->commit();
-        $user->notify(new AccountCreated($user, $token ?? null));
+
+        $user->notify(new AccountCreated($token ?? null));
 
         return $user;
     }

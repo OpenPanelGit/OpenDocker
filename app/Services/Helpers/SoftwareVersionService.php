@@ -1,102 +1,100 @@
 <?php
 
-namespace Pterodactyl\Services\Helpers;
+namespace App\Services\Helpers;
 
-use GuzzleHttp\Client;
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Arr;
-use Illuminate\Contracts\Cache\Repository as CacheRepository;
-use Pterodactyl\Exceptions\Service\Helper\CdnVersionFetchingException;
+use Exception;
+use Illuminate\Support\Facades\Http;
 
 class SoftwareVersionService
 {
-    public const VERSION_CACHE_KEY = 'openpanel:versioning_data';
-
-    private static array $result;
-
-    /**
-     * SoftwareVersionService constructor.
-     */
-    public function __construct(
-        protected CacheRepository $cache,
-        protected Client $client,
-    ) {
-        self::$result = $this->cacheVersionData();
-    }
-
-    /**
-     * Get the latest version of the panel from the CDN servers.
-     */
-    public function getPanel(): string
+    public function latestPanelVersionChangelog(): string
     {
-        return Arr::get(self::$result, 'panel') ?? 'error';
+        $key = 'panel:latest_version_changelog';
+        if (cache()->get($key) === 'error') {
+            cache()->forget($key);
+        }
+
+        return cache()->remember($key, now()->addMinutes(config('panel.cdn.cache_time', 60)), function () {
+            try {
+                $response = Http::timeout(5)->connectTimeout(1)->get('https://api.github.com/repos/pelican-dev/panel/releases/latest')->throw()->json();
+
+                return $response['body'];
+            } catch (Exception) {
+                return 'error';
+            }
+        });
     }
 
-    /**
-     * Get the latest version of the daemon from the CDN servers.
-     */
-    public function getDaemon(): string
+    public function latestPanelVersion(): string
     {
-        return Arr::get(self::$result, 'wings') ?? 'error';
+        $key = 'panel:latest_version';
+        if (cache()->get($key) === 'error') {
+            cache()->forget($key);
+        }
+
+        return cache()->remember($key, now()->addMinutes(config('panel.cdn.cache_time', 60)), function () {
+            try {
+                $response = Http::timeout(5)->connectTimeout(1)->get('https://api.github.com/repos/pelican-dev/panel/releases/latest')->throw()->json();
+
+                return trim($response['tag_name'], 'v');
+            } catch (Exception) {
+                return 'error';
+            }
+        });
     }
 
-    /**
-     * Get the URL to the discord server.
-     */
-    public function getDiscord(): string
+    public function latestWingsVersion(): string
     {
-        return Arr::get(self::$result, 'discord') ?? 'https://discord.gg/UhuYKKK2uM';
+        $key = 'wings:latest_version';
+        if (cache()->get($key) === 'error') {
+            cache()->forget($key);
+        }
+
+        return cache()->remember($key, now()->addMinutes(config('panel.cdn.cache_time', 60)), function () {
+            try {
+                $response = Http::timeout(5)->connectTimeout(1)->get('https://api.github.com/repos/pelican-dev/wings/releases/latest')->throw()->json();
+
+                return trim($response['tag_name'], 'v');
+            } catch (Exception) {
+                return 'error';
+            }
+        });
     }
 
-    /**
-     * Get the URL for donations.
-     */
-    public function getDonations(): string
-    {
-        return Arr::get(self::$result, 'donations') ?? 'https://liberapay.com/pyro';
-    }
-
-    /**
-     * Determine if the current version of the panel is the latest.
-     */
     public function isLatestPanel(): bool
     {
         if (config('app.version') === 'canary') {
             return true;
         }
 
-        return version_compare(config('app.version'), $this->getPanel()) >= 0;
+        return version_compare(config('app.version'), $this->latestPanelVersion()) >= 0;
     }
 
-    /**
-     * Determine if a passed daemon version string is the latest.
-     */
-    public function isLatestDaemon(string $version): bool
+    public function isLatestWings(string $version): bool
     {
         if ($version === 'develop') {
             return true;
         }
 
-        return version_compare($version, $this->getDaemon()) >= 0;
+        return version_compare($version, $this->latestWingsVersion()) >= 0;
     }
 
-    /**
-     * Keeps the versioning cache up-to-date with the latest results from the CDN.
-     */
-    protected function cacheVersionData(): array
+    public function currentPanelVersion(): string
     {
-        return $this->cache->remember(self::VERSION_CACHE_KEY, CarbonImmutable::now()->addMinutes(config('openpanel.cdn.cache_time', 60)), function () {
-            try {
-                $response = $this->client->request('GET', config('openpanel.cdn.url'));
+        return cache()->remember('panel:current_version', now()->addMinutes(5), function () {
+            if (file_exists(base_path('.git/HEAD'))) {
+                $head = explode(' ', file_get_contents(base_path('.git/HEAD')));
 
-                if ($response->getStatusCode() === 200) {
-                    return json_decode($response->getBody(), true);
+                if (array_key_exists(1, $head)) {
+                    $path = base_path('.git/' . trim($head[1]));
+
+                    if (file_exists($path)) {
+                        return 'canary (' . substr(file_get_contents($path), 0, 7) . ')';
+                    }
                 }
-
-                throw new CdnVersionFetchingException();
-            } catch (\Exception) {
-                return [];
             }
+
+            return config('app.version');
         });
     }
 }

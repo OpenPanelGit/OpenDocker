@@ -1,14 +1,15 @@
 <?php
 
-namespace Pterodactyl\Services\Servers;
+namespace App\Services\Servers;
 
-use Illuminate\Support\Arr;
-use Pterodactyl\Models\Egg;
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\ServerVariable;
+use App\Models\Egg;
+use App\Models\Server;
+use App\Models\ServerVariable;
+use App\Models\User;
+use App\Traits\Services\HasUserLevels;
 use Illuminate\Database\ConnectionInterface;
-use Pterodactyl\Traits\Services\HasUserLevels;
+use Illuminate\Support\Arr;
+use Throwable;
 
 class StartupModificationService
 {
@@ -17,14 +18,14 @@ class StartupModificationService
     /**
      * StartupModificationService constructor.
      */
-    public function __construct(private ConnectionInterface $connection, private VariableValidatorService $validatorService)
-    {
-    }
+    public function __construct(private ConnectionInterface $connection, private VariableValidatorService $validatorService) {}
 
     /**
      * Process startup modification for a server.
      *
-     * @throws \Throwable
+     * @param  array<array-key, mixed>  $data
+     *
+     * @throws Throwable
      */
     public function handle(Server $server, array $data): Server
     {
@@ -56,7 +57,7 @@ class StartupModificationService
             // in more to figure it out, but luckily we have a test case covering this
             // specific call so we can be assured we're not breaking it _here_ at least.
             //
-            // TODO(dane): this seems like a red-flag for the code powering the relationship
+            // TODO: this seems like a red-flag for the code powering the relationship
             //  that should be looked into more.
             return $server->fresh();
         });
@@ -64,19 +65,28 @@ class StartupModificationService
 
     /**
      * Update certain administrative settings for a server in the DB.
+     *
+     * @param array{
+     *     egg_id: ?int,
+     *     docker_image?: ?string,
+     *     startup?: ?string,
+     *     skip_scripts?: ?bool,
+     * } $data
      */
     protected function updateAdministrativeSettings(array $data, Server &$server): void
     {
         $eggId = Arr::get($data, 'egg_id');
 
         if (is_digit($eggId) && $server->egg_id !== (int) $eggId) {
-            /** @var Egg $egg */
-            $egg = Egg::query()->findOrFail($data['egg_id']);
+            $egg = Egg::findOrFail($data['egg_id']);
 
             $server = $server->forceFill([
                 'egg_id' => $egg->id,
-                'nest_id' => $egg->nest_id,
             ]);
+
+            // Fill missing fields from egg
+            $data['docker_image'] ??= Arr::first($egg->docker_images);
+            $data['startup'] ??= Arr::first($egg->startup_commands);
         }
 
         $server->fill([

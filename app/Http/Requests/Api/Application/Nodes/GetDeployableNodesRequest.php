@@ -1,6 +1,6 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Nodes;
+namespace App\Http\Requests\Api\Application\Nodes;
 
 class GetDeployableNodesRequest extends GetNodesRequest
 {
@@ -10,8 +10,11 @@ class GetDeployableNodesRequest extends GetNodesRequest
             'page' => 'integer',
             'memory' => 'required|integer|min:0',
             'disk' => 'required|integer|min:0',
-            'location_ids' => 'array',
-            'location_ids.*' => 'integer',
+            'cpu' => 'sometimes|integer|min:0',
+            'tags' => 'sometimes|array',
+
+            /** @deprecated use tags instead */
+            'location_ids' => 'sometimes|array',
         ];
     }
 }

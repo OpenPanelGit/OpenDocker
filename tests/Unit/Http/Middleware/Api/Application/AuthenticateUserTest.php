@@ -1,17 +1,17 @@
 <?php
 
-namespace Pterodactyl\Tests\Unit\Http\Middleware\Api\Application;
+namespace App\Tests\Unit\Http\Middleware\Api\Application;
 
-use Pterodactyl\Tests\Unit\Http\Middleware\MiddlewareTestCase;
+use App\Http\Middleware\Api\Application\AuthenticateApplicationUser;
+use App\Tests\Unit\Http\Middleware\MiddlewareTestCase;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
-use Pterodactyl\Http\Middleware\Api\Application\AuthenticateApplicationUser;
 
 class AuthenticateUserTest extends MiddlewareTestCase
 {
     /**
      * Test that no user defined results in an access denied exception.
      */
-    public function testNoUserDefined()
+    public function test_no_user_defined(): void
     {
         $this->expectException(AccessDeniedHttpException::class);
 
@@ -23,11 +23,11 @@ class AuthenticateUserTest extends MiddlewareTestCase
     /**
      * Test that a non-admin user results in an exception.
      */
-    public function testNonAdminUser()
+    public function test_non_admin_user(): void
     {
         $this->expectException(AccessDeniedHttpException::class);
 
-        $this->generateRequestUserModel(['root_admin' => false]);
+        $this->generateRequestUserModel(false, false);
 
         $this->getMiddleware()->handle($this->request, $this->getClosureAssertions());
     }
@@ -35,9 +35,19 @@ class AuthenticateUserTest extends MiddlewareTestCase
     /**
      * Test that an admin user continues though the middleware.
      */
-    public function testAdminUser()
+    public function test_admin_user(): void
     {
-        $this->generateRequestUserModel(['root_admin' => true]);
+        $this->generateRequestUserModel(true, false);
+
+        $this->getMiddleware()->handle($this->request, $this->getClosureAssertions());
+    }
+
+    /**
+     * Test that a root admin user continues though the middleware.
+     */
+    public function test_root_admin_user(): void
+    {
+        $this->generateRequestUserModel(true, true);
 
         $this->getMiddleware()->handle($this->request, $this->getClosureAssertions());
     }

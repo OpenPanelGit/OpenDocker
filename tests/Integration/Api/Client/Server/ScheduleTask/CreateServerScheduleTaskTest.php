@@ -1,24 +1,25 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client\Server\ScheduleTask;
+namespace App\Tests\Integration\Api\Client\Server\ScheduleTask;
 
-use Pterodactyl\Models\Task;
+use App\Enums\SubuserPermission;
+use App\Models\Schedule;
+use App\Models\Task;
+use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Illuminate\Http\Response;
-use Pterodactyl\Models\Schedule;
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class CreateServerScheduleTaskTest extends ClientApiIntegrationTestCase
 {
     /**
      * Test that a task can be created.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('permissionsDataProvider')]
-    public function testTaskCanBeCreated(array $permissions)
+    #[DataProvider('permissionsDataProvider')]
+    public function test_task_can_be_created(array $permissions): void
     {
         [$user, $server] = $this->generateTestAccount($permissions);
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
         $this->assertEmpty($schedule->tasks);
 
@@ -30,7 +31,7 @@ class CreateServerScheduleTaskTest extends ClientApiIntegrationTestCase
         ]);
 
         $response->assertOk();
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task = Task::query()->findOrFail($response->json('attributes.id'));
 
         $this->assertSame($schedule->id, $task->schedule_id);
@@ -44,11 +45,11 @@ class CreateServerScheduleTaskTest extends ClientApiIntegrationTestCase
     /**
      * Test that validation errors are returned correctly if bad data is passed into the API.
      */
-    public function testValidationErrorsAreReturned()
+    public function test_validation_errors_are_returned(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
 
         $response = $this->actingAs($user)->postJson($this->link($schedule, '/tasks'))->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -89,11 +90,11 @@ class CreateServerScheduleTaskTest extends ClientApiIntegrationTestCase
     /**
      * Test that backups can not be tasked when the backup limit is 0.
      */
-    public function testBackupsCanNotBeTaskedIfLimit0()
+    public function test_backups_can_not_be_tasked_if_limit0(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
 
         $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), [
@@ -116,13 +117,13 @@ class CreateServerScheduleTaskTest extends ClientApiIntegrationTestCase
      * Test that an error is returned if the user attempts to create an additional task that
      * would put the schedule over the task limit.
      */
-    public function testErrorIsReturnedIfTooManyTasksExistForSchedule()
+    public function test_error_is_returned_if_too_many_tasks_exist_for_schedule(): void
     {
-        config()->set('pterodactyl.client_features.schedules.per_schedule_task_limit', 2);
+        config()->set('panel.client_features.schedules.per_schedule_task_limit', 2);
 
         [$user, $server] = $this->generateTestAccount();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
         Task::factory()->times(2)->create(['schedule_id' => $schedule->id]);
 
@@ -140,12 +141,12 @@ class CreateServerScheduleTaskTest extends ClientApiIntegrationTestCase
      * Test that an error is returned if the targeted schedule does not belong to the server
      * in the request.
      */
-    public function testErrorIsReturnedIfScheduleDoesNotBelongToServer()
+    public function test_error_is_returned_if_schedule_does_not_belong_to_server(): void
     {
         [$user, $server] = $this->generateTestAccount();
         $server2 = $this->createServerModel(['owner_id' => $user->id]);
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server2->id]);
 
         $this->actingAs($user)
@@ -157,11 +158,11 @@ class CreateServerScheduleTaskTest extends ClientApiIntegrationTestCase
      * Test that an error is returned if the subuser making the request does not have permission
      * to update a schedule.
      */
-    public function testErrorIsReturnedIfSubuserDoesNotHaveScheduleUpdatePermissions()
+    public function test_error_is_returned_if_subuser_does_not_have_schedule_update_permissions(): void
     {
-        [$user, $server] = $this->generateTestAccount([Permission::ACTION_SCHEDULE_CREATE]);
+        [$user, $server] = $this->generateTestAccount([SubuserPermission::ScheduleCreate]);
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
 
         $this->actingAs($user)
@@ -171,6 +172,6 @@ class CreateServerScheduleTaskTest extends ClientApiIntegrationTestCase
 
     public static function permissionsDataProvider(): array
     {
-        return [[[]], [[Permission::ACTION_SCHEDULE_UPDATE]]];
+        return [[[]], [[SubuserPermission::ScheduleUpdate]]];
     }
 }

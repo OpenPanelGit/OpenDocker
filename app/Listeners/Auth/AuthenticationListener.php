@@ -1,38 +1,37 @@
 <?php
 
-namespace Pterodactyl\Listeners\Auth;
+namespace App\Listeners\Auth;
 
-use Pterodactyl\Facades\Activity;
+use App\Facades\Activity;
 use Illuminate\Auth\Events\Failed;
-use Pterodactyl\Events\Auth\DirectLogin;
-use Illuminate\Contracts\Events\Dispatcher;
-use Pterodactyl\Extensions\Illuminate\Events\Contracts\SubscribesToEvents;
+use Illuminate\Auth\Events\Login;
 
-class AuthenticationListener implements SubscribesToEvents
+class AuthenticationListener
 {
+    private const PROTECTED_FIELDS = [
+        'password', 'token', 'secret',
+    ];
+
     /**
      * Handles an authentication event by logging the user and information about
      * the request.
      */
-    public function handle(Failed|DirectLogin $event): void
+    public function handle(Failed|Login $event): void
     {
         $activity = Activity::withRequestMetadata();
+
         if ($event->user) {
             $activity = $activity->subject($event->user);
         }
 
         if ($event instanceof Failed) {
             foreach ($event->credentials as $key => $value) {
-                $activity = $activity->property($key, $value);
+                if (!in_array($key, self::PROTECTED_FIELDS, true)) {
+                    $activity = $activity->property($key, $value);
+                }
             }
         }
 
         $activity->event($event instanceof Failed ? 'auth:fail' : 'auth:success')->log();
-    }
-
-    public function subscribe(Dispatcher $events): void
-    {
-        $events->listen(Failed::class, self::class);
-        $events->listen(DirectLogin::class, self::class);
     }
 }

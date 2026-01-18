@@ -1,28 +1,31 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration;
+namespace App\Tests\Integration;
 
+use App\Events\ActivityLogged;
+use App\Tests\Assertions\AssertsActivityLogged;
+use App\Tests\TestCase;
+use App\Tests\Traits\Integration\CreatesTestModels;
+use App\Transformers\Api\Application\BaseTransformer;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Pterodactyl\Tests\TestCase;
+use Illuminate\Foundation\Testing\DatabaseTruncation;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Pterodactyl\Events\ActivityLogged;
-use Pterodactyl\Tests\Assertions\AssertsActivityLogged;
-use Pterodactyl\Tests\Traits\Integration\CreatesTestModels;
-use Pterodactyl\Transformers\Api\Application\BaseTransformer;
 
 abstract class IntegrationTestCase extends TestCase
 {
-    use CreatesTestModels;
     use AssertsActivityLogged;
+    use CreatesTestModels;
+    use DatabaseTruncation;
 
-    protected array $connectionsToTransact = ['mysql'];
+    protected $seed = true;
 
     protected $defaultHeaders = [
         'Accept' => 'application/json',
     ];
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -37,5 +40,15 @@ abstract class IntegrationTestCase extends TestCase
         return CarbonImmutable::createFromFormat(CarbonInterface::DEFAULT_TO_STRING_FORMAT, $timestamp)
             ->setTimezone(BaseTransformer::RESPONSE_TIMEZONE)
             ->toAtomString();
+    }
+
+    /**
+     * The database connections that should have transactions.
+     *
+     * @return array
+     */
+    protected function connectionsToTransact()
+    {
+        return [DB::getDriverName()];
     }
 }

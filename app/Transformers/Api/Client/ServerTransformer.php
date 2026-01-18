@@ -1,18 +1,18 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Client;
+namespace App\Transformers\Api\Client;
 
-use Pterodactyl\Models\Egg;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Subuser;
-use League\Fractal\Resource\Item;
-use Pterodactyl\Models\Allocation;
-use Pterodactyl\Models\Permission;
+use App\Enums\SubuserPermission;
+use App\Models\Allocation;
+use App\Models\Egg;
+use App\Models\EggVariable;
+use App\Models\Server;
+use App\Models\Subuser;
+use App\Services\Servers\StartupCommandService;
 use Illuminate\Container\Container;
-use Pterodactyl\Models\EggVariable;
 use League\Fractal\Resource\Collection;
+use League\Fractal\Resource\Item;
 use League\Fractal\Resource\NullResource;
-use Pterodactyl\Services\Servers\StartupCommandService;
 
 class ServerTransformer extends BaseClientTransformer
 {
@@ -26,19 +26,18 @@ class ServerTransformer extends BaseClientTransformer
     }
 
     /**
-     * Transform a server model into a representation that can be returned
-     * to a client.
+     * @param  Server  $server
      */
-    public function transform(Server $server): array
+    public function transform($server): array
     {
         /** @var StartupCommandService $service */
         $service = Container::getInstance()->make(StartupCommandService::class);
 
         $user = $this->request->user();
 
-        return [
+        $data = [
             'server_owner' => $user->id === $server->owner_id,
-            'identifier' => $server->uuidShort,
+            'identifier' => $server->uuid_short,
             'internal_id' => $server->id,
             'uuid' => $server->uuid,
             'name' => $server->name,
@@ -46,32 +45,28 @@ class ServerTransformer extends BaseClientTransformer
             'is_node_under_maintenance' => $server->node->isUnderMaintenance(),
             'sftp_details' => [
                 'ip' => $server->node->fqdn,
-                'port' => $server->node->daemonSFTP,
-            ],
-            'sftp_alias' => [
-                'ip' => $server->node->SFTPAliasAddress,
-                'port' => $server->node->SFTPAliasPort
+                'alias' => $server->node->daemon_sftp_alias,
+                'port' => $server->node->daemon_sftp,
             ],
             'description' => $server->description,
             'limits' => [
                 'memory' => $server->memory,
-                'overhead_memory' => $server->overhead_memory,
                 'swap' => $server->swap,
                 'disk' => $server->disk,
                 'io' => $server->io,
                 'cpu' => $server->cpu,
                 'threads' => $server->threads,
-                'oom_disabled' => $server->oom_disabled,
+                // This field is deprecated, please use "oom_killer".
+                'oom_disabled' => !$server->oom_killer,
+                'oom_killer' => $server->oom_killer,
             ],
-            'invocation' => $service->handle($server, !$user->can(Permission::ACTION_STARTUP_READ, $server)),
+            'invocation' => $service->handle($server, hideAllValues: !$user->can(SubuserPermission::StartupRead, $server)),
             'docker_image' => $server->image,
             'egg_features' => $server->egg->inherit_features,
-            'egg' => $server->egg->uuid,
             'feature_limits' => [
                 'databases' => $server->database_limit,
                 'allocations' => $server->allocation_limit,
                 'backups' => $server->backup_limit,
-                'backupStorageMb' => $server->backup_storage_limit,
             ],
             'status' => $server->status,
             // This field is deprecated, please use "status".
@@ -79,15 +74,17 @@ class ServerTransformer extends BaseClientTransformer
             // This field is deprecated, please use "status".
             'is_installing' => !$server->isInstalled(),
             'is_transferring' => !is_null($server->transfer),
-            'daemon_type' => $server->node->daemonType,
-            'backup_disk' => $server->node->backupDisk,
         ];
+
+        if (!config('panel.editable_server_descriptions')) {
+            unset($data['description']);
+        }
+
+        return $data;
     }
 
     /**
      * Returns the allocations associated with this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeAllocations(Server $server): Collection
     {
@@ -101,7 +98,7 @@ class ServerTransformer extends BaseClientTransformer
         //
         // This allows us to avoid too much permission regression, without also hiding information that
         // is generally needed for the frontend to make sense when browsing or searching results.
-        if (!$user->can(Permission::ACTION_ALLOCATION_READ, $server)) {
+        if (!$user->can(SubuserPermission::AllocationRead, $server)) {
             $primary = clone $server->allocation;
             $primary->notes = null;
 
@@ -111,12 +108,9 @@ class ServerTransformer extends BaseClientTransformer
         return $this->collection($server->allocations, $transformer, Allocation::RESOURCE_NAME);
     }
 
-    /**
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
-     */
     public function includeVariables(Server $server): Collection|NullResource
     {
-        if (!$this->request->user()->can(Permission::ACTION_STARTUP_READ, $server)) {
+        if (!$this->request->user()->can(SubuserPermission::StartupRead, $server)) {
             return $this->null();
         }
 
@@ -129,8 +123,6 @@ class ServerTransformer extends BaseClientTransformer
 
     /**
      * Returns the egg associated with this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeEgg(Server $server): Item
     {
@@ -139,12 +131,10 @@ class ServerTransformer extends BaseClientTransformer
 
     /**
      * Returns the subusers associated with this server.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeSubusers(Server $server): Collection|NullResource
     {
-        if (!$this->request->user()->can(Permission::ACTION_USER_READ, $server)) {
+        if (!$this->request->user()->can(SubuserPermission::UserRead, $server)) {
             return $this->null();
         }
 

@@ -1,18 +1,19 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Application\Users;
+namespace App\Http\Requests\Api\Application\Users;
 
-use Pterodactyl\Models\User;
+use App\Models\User;
 
 class UpdateUserRequest extends StoreUserRequest
 {
     /**
-     * Return the validation rules for this request.
+     * @param  array<array-key, string|string[]> |null  $rules
+     * @return array<array-key, string|string[]>
      */
     public function rules(?array $rules = null): array
     {
-        $userId = $this->parameter('user', User::class)->id;
+        $user = $this->parameter('user', User::class);
 
-        return parent::rules(User::getRulesForUpdate($userId));
+        return parent::rules(User::getRulesForUpdate($user));
     }
 }

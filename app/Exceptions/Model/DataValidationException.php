@@ -1,15 +1,15 @@
 <?php
 
-namespace Pterodactyl\Exceptions\Model;
+namespace App\Exceptions\Model;
 
-use Illuminate\Support\MessageBag;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Contracts\Validation\Validator;
-use Pterodactyl\Exceptions\PterodactylException;
+use App\Exceptions\PanelException;
 use Illuminate\Contracts\Support\MessageProvider;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\MessageBag;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
-class DataValidationException extends PterodactylException implements HttpExceptionInterface, MessageProvider
+class DataValidationException extends PanelException implements HttpExceptionInterface, MessageProvider
 {
     /**
      * DataValidationException constructor.
@@ -42,6 +42,9 @@ class DataValidationException extends PterodactylException implements HttpExcept
         return 500;
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function getHeaders(): array
     {
         return [];

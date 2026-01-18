@@ -1,13 +1,10 @@
 <?php
 
-namespace Pterodactyl\Services\Databases\Hosts;
+namespace App\Services\Databases\Hosts;
 
-use Pterodactyl\Models\DatabaseHost;
-use Illuminate\Database\DatabaseManager;
+use App\Models\DatabaseHost;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Contracts\Encryption\Encrypter;
-use Pterodactyl\Extensions\DynamicDatabaseConnection;
-use Pterodactyl\Contracts\Repository\DatabaseHostRepositoryInterface;
+use Throwable;
 
 class HostUpdateService
 {
@@ -16,30 +13,30 @@ class HostUpdateService
      */
     public function __construct(
         private ConnectionInterface $connection,
-        private DatabaseManager $databaseManager,
-        private DynamicDatabaseConnection $dynamic,
-        private Encrypter $encrypter,
-        private DatabaseHostRepositoryInterface $repository,
-    ) {
-    }
+    ) {}
 
     /**
      * Update a database host and persist to the database.
      *
-     * @throws \Throwable
+     * @param  array<mixed>  $data
+     *
+     * @throws Throwable
      */
-    public function handle(int $hostId, array $data): DatabaseHost
+    public function handle(DatabaseHost|int $host, array $data): DatabaseHost
     {
-        if (!empty(array_get($data, 'password'))) {
-            $data['password'] = $this->encrypter->encrypt($data['password']);
-        } else {
+        if (!$host instanceof DatabaseHost) {
+            $host = DatabaseHost::query()->findOrFail($host);
+        }
+
+        if (empty(array_get($data, 'password'))) {
             unset($data['password']);
         }
 
-        return $this->connection->transaction(function () use ($data, $hostId) {
-            $host = $this->repository->update($hostId, $data);
-            $this->dynamic->set('dynamic', $host);
-            $this->databaseManager->connection('dynamic')->select('SELECT 1 FROM dual');
+        return $this->connection->transaction(function () use ($data, $host) {
+            $host->update($data);
+
+            // Confirm access using the provided credentials before saving data.
+            $host->buildConnection()->getPdo();
 
             return $host;
         });

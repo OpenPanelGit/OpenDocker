@@ -1,26 +1,25 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Services\Servers;
+namespace App\Tests\Integration\Services\Servers;
 
-use Exception;
-use Pterodactyl\Models\Nest;
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\ServerVariable;
-use Illuminate\Validation\ValidationException;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
+use App\Models\Egg;
+use App\Models\Server;
+use App\Models\ServerVariable;
+use App\Models\User;
+use App\Services\Servers\StartupModificationService;
+use App\Tests\Integration\IntegrationTestCase;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Pterodactyl\Services\Servers\StartupModificationService;
+use Illuminate\Validation\ValidationException;
 
 class StartupModificationServiceTest extends IntegrationTestCase
 {
     /**
      * Test that a non-admin request to modify the server startup parameters does
-     * not perform any egg or nest updates. This also attempts to pass through an
+     * not perform any egg updates. This also attempts to pass through an
      * egg_id variable which should have no impact if the request is coming from
      * a non-admin entity.
      */
-    public function testNonAdminCanModifyServerVariables()
+    public function test_non_admin_can_modify_server_variables(): void
     {
         $server = $this->createServerModel();
 
@@ -37,7 +36,7 @@ class StartupModificationServiceTest extends IntegrationTestCase
         } catch (\Exception $exception) {
             $this->assertInstanceOf(ValidationException::class, $exception);
 
-            /** @var ValidationException $exception */
+            /** @var \Illuminate\Validation\ValidationException $exception */
             $errors = $exception->validator->errors()->toArray();
 
             $this->assertCount(1, $errors);
@@ -61,22 +60,21 @@ class StartupModificationServiceTest extends IntegrationTestCase
         $this->assertInstanceOf(Server::class, $result);
         $this->assertCount(2, $result->variables);
         $this->assertSame($server->startup, $result->startup);
-        $this->assertSame('1234', $result->variables[0]->server_value);
-        $this->assertSame('test.jar', $result->variables[1]->server_value);
+        $this->assertSame('1234', $result->variables->firstWhere('env_variable', 'BUNGEE_VERSION')->server_value);
+        $this->assertSame('test.jar', $result->variables->firstWhere('env_variable', 'SERVER_JARFILE')->server_value);
     }
 
     /**
      * Test that modifying an egg as an admin properly updates the data for the server.
      */
-    public function testServerIsProperlyModifiedAsAdminUser()
+    public function test_server_is_properly_modified_as_admin_user(): void
     {
-        /** @var \Pterodactyl\Models\Egg $nextEgg */
-        $nextEgg = Nest::query()->findOrFail(2)->eggs()->firstOrFail();
+        /** @var \App\Models\Egg $nextEgg */
+        $nextEgg = Egg::query()->findOrFail(2);
 
         $server = $this->createServerModel(['egg_id' => 1]);
 
         $this->assertNotSame($nextEgg->id, $server->egg_id);
-        $this->assertNotSame($nextEgg->nest_id, $server->nest_id);
 
         $response = $this->getService()
             ->setUserLevel(User::USER_LEVEL_ADMIN)
@@ -89,7 +87,6 @@ class StartupModificationServiceTest extends IntegrationTestCase
 
         $this->assertInstanceOf(Server::class, $response);
         $this->assertSame($nextEgg->id, $response->egg_id);
-        $this->assertSame($nextEgg->nest_id, $response->nest_id);
         $this->assertSame('sample startup', $response->startup);
         $this->assertSame('docker/hodor', $response->image);
         $this->assertTrue($response->skip_scripts);
@@ -102,14 +99,14 @@ class StartupModificationServiceTest extends IntegrationTestCase
      * Test that hidden variables can be updated by an admin but are not affected by a
      * regular user who attempts to pass them through.
      */
-    public function testEnvironmentVariablesCanBeUpdatedByAdmin()
+    public function test_environment_variables_can_be_updated_by_admin(): void
     {
         $server = $this->createServerModel();
         $server->loadMissing(['egg', 'variables']);
 
         $clone = $this->cloneEggAndVariables($server->egg);
         // This makes the BUNGEE_VERSION variable not user editable.
-        $clone->variables()->first()->update([
+        $clone->variables()->firstWhere('env_variable', 'BUNGEE_VERSION')->update([
             'user_editable' => false,
         ]);
 
@@ -118,7 +115,7 @@ class StartupModificationServiceTest extends IntegrationTestCase
 
         ServerVariable::query()->updateOrCreate([
             'server_id' => $server->id,
-            'variable_id' => $server->variables[0]->id,
+            'variable_id' => $server->variables()->firstWhere('env_variable', 'BUNGEE_VERSION')->id,
         ], ['variable_value' => 'EXIST']);
 
         $response = $this->getService()->handle($server, [
@@ -129,8 +126,8 @@ class StartupModificationServiceTest extends IntegrationTestCase
         ]);
 
         $this->assertCount(2, $response->variables);
-        $this->assertSame('EXIST', $response->variables[0]->server_value);
-        $this->assertSame('test.jar', $response->variables[1]->server_value);
+        $this->assertSame('EXIST', $response->variables()->firstWhere('env_variable', 'BUNGEE_VERSION')->server_value);
+        $this->assertSame('test.jar', $response->variables()->firstWhere('env_variable', 'SERVER_JARFILE')->server_value);
 
         $response = $this->getService()
             ->setUserLevel(User::USER_LEVEL_ADMIN)
@@ -142,15 +139,15 @@ class StartupModificationServiceTest extends IntegrationTestCase
             ]);
 
         $this->assertCount(2, $response->variables);
-        $this->assertSame('1234', $response->variables[0]->server_value);
-        $this->assertSame('test.jar', $response->variables[1]->server_value);
+        $this->assertSame('1234', $response->variables()->firstWhere('env_variable', 'BUNGEE_VERSION')->server_value);
+        $this->assertSame('test.jar', $response->variables()->firstWhere('env_variable', 'SERVER_JARFILE')->server_value);
     }
 
     /**
      * Test that passing an invalid egg ID into the function throws an exception
      * rather than silently failing or skipping.
      */
-    public function testInvalidEggIdTriggersException()
+    public function test_invalid_egg_id_triggers_exception(): void
     {
         $server = $this->createServerModel();
 

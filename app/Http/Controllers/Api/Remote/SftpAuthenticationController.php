@@ -1,30 +1,28 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Remote;
+namespace App\Http\Controllers\Api\Remote;
 
-use Illuminate\Http\Request;
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Server;
-use Illuminate\Http\JsonResponse;
-use Pterodactyl\Facades\Activity;
-use Pterodactyl\Models\Permission;
-use phpseclib3\Crypt\PublicKeyLoader;
-use Pterodactyl\Http\Controllers\Controller;
-use phpseclib3\Exception\NoKeyLoadedException;
+use App\Enums\SubuserPermission;
+use App\Exceptions\Http\HttpForbiddenException;
+use App\Facades\Activity;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\Remote\SftpAuthenticationFormRequest;
+use App\Models\Server;
+use App\Models\User;
+use App\Services\Servers\GetUserPermissionsService;
 use Illuminate\Foundation\Auth\ThrottlesLogins;
-use Pterodactyl\Exceptions\Http\HttpForbiddenException;
-use Pterodactyl\Services\Servers\GetUserPermissionsService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Exception\NoKeyLoadedException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Pterodactyl\Http\Requests\Api\Remote\SftpAuthenticationFormRequest;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
 class SftpAuthenticationController extends Controller
 {
     use ThrottlesLogins;
 
-    public function __construct(protected GetUserPermissionsService $permissions)
-    {
-    }
+    public function __construct(protected GetUserPermissionsService $permissions) {}
 
     /**
      * Authenticate a set of credentials and return the associated server details
@@ -89,7 +87,7 @@ class SftpAuthenticationController extends Controller
     protected function getServer(Request $request, string $uuid): Server
     {
         return Server::query()
-            ->where(fn ($builder) => $builder->where('uuid', $uuid)->orWhere('uuidShort', $uuid))
+            ->where(fn ($builder) => $builder->where('uuid', $uuid)->orWhere('uuid_short', $uuid))
             ->where('node_id', $request->attributes->get('node')->id)
             ->firstOr(function () use ($request) {
                 $this->reject($request);
@@ -101,7 +99,7 @@ class SftpAuthenticationController extends Controller
      */
     protected function getUser(Request $request, string $username): User
     {
-        return User::query()->where('username', $username)->firstOr(function () use ($request) {
+        return User::where('username', str($username)->lower()->trim())->firstOr(function () use ($request) {
             $this->reject($request);
         });
     }
@@ -140,10 +138,10 @@ class SftpAuthenticationController extends Controller
      */
     protected function validateSftpAccess(User $user, Server $server): void
     {
-        if (!$user->root_admin && $server->owner_id !== $user->id) {
+        if ($user->cannot('update server', $server) && $server->owner_id !== $user->id) {
             $permissions = $this->permissions->handle($server, $user);
 
-            if (!in_array(Permission::ACTION_FILE_SFTP, $permissions)) {
+            if (!in_array(SubuserPermission::FileSftp->value, $permissions)) {
                 Activity::event('server:sftp.denied')->actor($user)->subject($server)->log();
 
                 throw new HttpForbiddenException('You do not have permission to access SFTP for this server.');
@@ -160,6 +158,6 @@ class SftpAuthenticationController extends Controller
     {
         $username = explode('.', strrev($request->input('username', '')));
 
-        return strtolower(strrev($username[0] ?? '') . '|' . $request->ip());
+        return strtolower(strrev($username[0]) . '|' . $request->ip());
     }
 }

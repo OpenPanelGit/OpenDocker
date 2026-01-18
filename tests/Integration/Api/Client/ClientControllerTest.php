@@ -1,12 +1,14 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Api\Client;
+namespace App\Tests\Integration\Api\Client;
 
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Subuser;
-use Pterodactyl\Models\Allocation;
-use Pterodactyl\Models\Permission;
+use App\Enums\SubuserPermission;
+use App\Models\Allocation;
+use App\Models\Role;
+use App\Models\Server;
+use App\Models\Subuser;
+use App\Models\User;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class ClientControllerTest extends ClientApiIntegrationTestCase
 {
@@ -16,12 +18,12 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * a subuser, but for this test we just want to test a basic scenario and pretend
      * subusers do not exist at all.
      */
-    public function testOnlyLoggedInUsersServersAreReturned()
+    public function test_only_logged_in_users_servers_are_returned(): void
     {
-        /** @var \Pterodactyl\Models\User[] $users */
+        /** @var \App\Models\User[] $users */
         $users = User::factory()->times(3)->create();
 
-        /** @var \Pterodactyl\Models\Server[] $servers */
+        /** @var \App\Models\Server[] $servers */
         $servers = [
             $this->createServerModel(['user_id' => $users[0]->id]),
             $this->createServerModel(['user_id' => $users[1]->id]),
@@ -33,7 +35,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         $response->assertOk();
         $response->assertJsonPath('object', 'list');
         $response->assertJsonPath('data.0.object', Server::RESOURCE_NAME);
-        $response->assertJsonPath('data.0.attributes.identifier', $servers[0]->uuidShort);
+        $response->assertJsonPath('data.0.attributes.identifier', $servers[0]->uuid_short);
         $response->assertJsonPath('data.0.attributes.server_owner', true);
         $response->assertJsonPath('meta.pagination.total', 1);
         $response->assertJsonPath('meta.pagination.per_page', 50);
@@ -43,66 +45,66 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * Test that using ?filter[*]=name|uuid returns any server matching that name or UUID
      * with the search filters.
      */
-    public function testServersAreFilteredUsingNameAndUuidInformation()
+    public function test_servers_are_filtered_using_name_and_uuid_information(): void
     {
-        /** @var \Pterodactyl\Models\User[] $users */
+        /** @var \App\Models\User[] $users */
         $users = User::factory()->times(2)->create();
-        $users[0]->update(['root_admin' => true]);
+        $users[0]->syncRoles(Role::getRootAdmin());
 
-        /** @var \Pterodactyl\Models\Server[] $servers */
+        /** @var \App\Models\Server[] $servers */
         $servers = [
-            $this->createServerModel(['user_id' => $users[0]->id, 'name' => 'Julia']),
-            $this->createServerModel(['user_id' => $users[1]->id, 'uuidShort' => '12121212', 'name' => 'Janice']),
-            $this->createServerModel(['user_id' => $users[1]->id, 'uuid' => '88788878-12356789', 'external_id' => 'ext123', 'name' => 'Julia']),
-            $this->createServerModel(['user_id' => $users[1]->id, 'uuid' => '88788878-abcdefgh', 'name' => 'Jennifer']),
+            $this->createServerModel(['user_id' => $users[0]->id, 'name' => 'julia']),
+            $this->createServerModel(['user_id' => $users[1]->id, 'uuid_short' => '12121212', 'name' => 'janice']),
+            $this->createServerModel(['user_id' => $users[1]->id, 'uuid' => '88788878-12356789', 'external_id' => 'ext123', 'name' => 'julia']),
+            $this->createServerModel(['user_id' => $users[1]->id, 'uuid' => '88788878-abcdefgh', 'name' => 'jennifer']),
         ];
 
-        $this->actingAs($users[1])->getJson('/api/client?filter[*]=Julia')
+        $this->actingAs($users[1])->getJson('/api/client?filter[*]=julia')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuid_short);
 
         $this->actingAs($users[1])->getJson('/api/client?filter[*]=ext123')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuid_short);
 
         $this->actingAs($users[1])->getJson('/api/client?filter[*]=ext123')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuid_short);
 
         $this->actingAs($users[1])->getJson('/api/client?filter[*]=12121212')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $servers[1]->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $servers[1]->uuid_short);
 
         $this->actingAs($users[1])->getJson('/api/client?filter[*]=88788878')
             ->assertOk()
             ->assertJsonCount(2, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuidShort)
-            ->assertJsonPath('data.1.attributes.identifier', $servers[3]->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuid_short)
+            ->assertJsonPath('data.1.attributes.identifier', $servers[3]->uuid_short);
 
         $this->actingAs($users[1])->getJson('/api/client?filter[*]=88788878-abcd')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $servers[3]->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $servers[3]->uuid_short);
 
-        $this->actingAs($users[0])->getJson('/api/client?filter[*]=Julia&type=admin-all')
+        $this->actingAs($users[0])->getJson('/api/client?filter[*]=julia&type=admin-all')
             ->assertOk()
             ->assertJsonCount(2, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $servers[0]->uuidShort)
-            ->assertJsonPath('data.1.attributes.identifier', $servers[2]->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $servers[0]->uuid_short)
+            ->assertJsonPath('data.1.attributes.identifier', $servers[2]->uuid_short);
     }
 
     /**
      * Test that using ?filter[*]=:25565 or ?filter[*]=192.168.1.1:25565 returns only those servers
      * with the same allocation for the given user.
      */
-    public function testServersAreFilteredUsingAllocationInformation()
+    public function test_servers_are_filtered_using_allocation_information(): void
     {
-        /** @var User $user */
-        /** @var Server $server */
+        /** @var \App\Models\User $user */
+        /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount();
         $server2 = $this->createServerModel(['user_id' => $user->id, 'node_id' => $server->node_id]);
 
@@ -118,32 +120,32 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         $this->actingAs($user)->getJson('/api/client?filter[*]=192.168.1.1')
             ->assertOk()
             ->assertJsonCount(2, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $server->uuidShort)
-            ->assertJsonPath('data.1.attributes.identifier', $server2->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $server->uuid_short)
+            ->assertJsonPath('data.1.attributes.identifier', $server2->uuid_short);
 
         $this->actingAs($user)->getJson('/api/client?filter[*]=192.168.1.1:25565')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $server->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $server->uuid_short);
 
         $this->actingAs($user)->getJson('/api/client?filter[*]=:25570')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $server2->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $server2->uuid_short);
 
         $this->actingAs($user)->getJson('/api/client?filter[*]=:255')
             ->assertOk()
             ->assertJsonCount(2, 'data')
-            ->assertJsonPath('data.0.attributes.identifier', $server->uuidShort)
-            ->assertJsonPath('data.1.attributes.identifier', $server2->uuidShort);
+            ->assertJsonPath('data.0.attributes.identifier', $server->uuid_short)
+            ->assertJsonPath('data.1.attributes.identifier', $server2->uuid_short);
     }
 
     /**
      * Test that servers where the user is a subuser are returned by default in the API call.
      */
-    public function testServersUserIsASubuserOfAreReturned()
+    public function test_servers_user_is_a_subuser_of_are_returned(): void
     {
-        /** @var \Pterodactyl\Models\User[] $users */
+        /** @var \App\Models\User[] $users */
         $users = User::factory()->times(3)->create();
         $servers = [
             $this->createServerModel(['user_id' => $users[0]->id]),
@@ -156,7 +158,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         Subuser::query()->create([
             'user_id' => $users[0]->id,
             'server_id' => $servers[1]->id,
-            'permissions' => [Permission::ACTION_WEBSOCKET_CONNECT],
+            'permissions' => [SubuserPermission::WebsocketConnect->value],
         ]);
 
         $response = $this->actingAs($users[0])->getJson('/api/client');
@@ -164,17 +166,17 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         $response->assertOk();
         $response->assertJsonCount(2, 'data');
         $response->assertJsonPath('data.0.attributes.server_owner', true);
-        $response->assertJsonPath('data.0.attributes.identifier', $servers[0]->uuidShort);
+        $response->assertJsonPath('data.0.attributes.identifier', $servers[0]->uuid_short);
         $response->assertJsonPath('data.1.attributes.server_owner', false);
-        $response->assertJsonPath('data.1.attributes.identifier', $servers[1]->uuidShort);
+        $response->assertJsonPath('data.1.attributes.identifier', $servers[1]->uuid_short);
     }
 
     /**
      * Returns only servers that the user owns, not servers they are a subuser of.
      */
-    public function testFilterOnlyOwnerServers()
+    public function test_filter_only_owner_servers(): void
     {
-        /** @var \Pterodactyl\Models\User[] $users */
+        /** @var \App\Models\User[] $users */
         $users = User::factory()->times(3)->create();
         $servers = [
             $this->createServerModel(['user_id' => $users[0]->id]),
@@ -187,7 +189,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         Subuser::query()->create([
             'user_id' => $users[0]->id,
             'server_id' => $servers[1]->id,
-            'permissions' => [Permission::ACTION_WEBSOCKET_CONNECT],
+            'permissions' => [SubuserPermission::WebsocketConnect],
         ]);
 
         $response = $this->actingAs($users[0])->getJson('/api/client?type=owner');
@@ -195,15 +197,15 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         $response->assertOk();
         $response->assertJsonCount(1, 'data');
         $response->assertJsonPath('data.0.attributes.server_owner', true);
-        $response->assertJsonPath('data.0.attributes.identifier', $servers[0]->uuidShort);
+        $response->assertJsonPath('data.0.attributes.identifier', $servers[0]->uuid_short);
     }
 
     /**
      * Tests that the permissions from the Panel are returned correctly.
      */
-    public function testPermissionsAreReturned()
+    public function test_permissions_are_returned(): void
     {
-        /** @var User $user */
+        /** @var \App\Models\User $user */
         $user = User::factory()->create();
 
         $this->actingAs($user)
@@ -212,7 +214,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
             ->assertJson([
                 'object' => 'system_permissions',
                 'attributes' => [
-                    'permissions' => Permission::permissions()->toArray(),
+                    'permissions' => Subuser::allPermissionKeys(),
                 ],
             ]);
     }
@@ -221,11 +223,11 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * Test that only servers a user can access because they are an administrator are returned. This
      * will always exclude any servers they can see because they're the owner or a subuser of the server.
      */
-    public function testOnlyAdminLevelServersAreReturned()
+    public function test_only_admin_level_servers_are_returned(): void
     {
-        /** @var \Pterodactyl\Models\User[] $users */
+        /** @var \App\Models\User[] $users */
         $users = User::factory()->times(4)->create();
-        $users[0]->update(['root_admin' => true]);
+        $users[0]->syncRoles(Role::getRootAdmin());
 
         $servers = [
             $this->createServerModel(['user_id' => $users[0]->id]),
@@ -237,7 +239,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         Subuser::query()->create([
             'user_id' => $users[0]->id,
             'server_id' => $servers[1]->id,
-            'permissions' => [Permission::ACTION_WEBSOCKET_CONNECT],
+            'permissions' => [SubuserPermission::WebsocketConnect->value],
         ]);
 
         // Only servers 2 & 3 (0 indexed) should be returned by the API at this point. The user making
@@ -248,19 +250,19 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         $response->assertJsonCount(2, 'data');
 
         $response->assertJsonPath('data.0.attributes.server_owner', false);
-        $response->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuidShort);
+        $response->assertJsonPath('data.0.attributes.identifier', $servers[2]->uuid_short);
         $response->assertJsonPath('data.1.attributes.server_owner', false);
-        $response->assertJsonPath('data.1.attributes.identifier', $servers[3]->uuidShort);
+        $response->assertJsonPath('data.1.attributes.identifier', $servers[3]->uuid_short);
     }
 
     /**
      * Test that all servers a user can access as an admin are returned if using ?filter=admin-all.
      */
-    public function testAllServersAreReturnedToAdmin()
+    public function test_all_servers_are_returned_to_admin(): void
     {
-        /** @var \Pterodactyl\Models\User[] $users */
+        /** @var \App\Models\User[] $users */
         $users = User::factory()->times(4)->create();
-        $users[0]->update(['root_admin' => true]);
+        $users[0]->syncRoles(Role::getRootAdmin());
 
         $servers = [
             $this->createServerModel(['user_id' => $users[0]->id]),
@@ -272,7 +274,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         Subuser::query()->create([
             'user_id' => $users[0]->id,
             'server_id' => $servers[1]->id,
-            'permissions' => [Permission::ACTION_WEBSOCKET_CONNECT],
+            'permissions' => [SubuserPermission::WebsocketConnect->value],
         ]);
 
         // All servers should be returned.
@@ -286,10 +288,10 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * Test that no servers get returned if the user requests all admin level servers by using
      * ?type=admin or ?type=admin-all in the request.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('filterTypeDataProvider')]
-    public function testNoServersAreReturnedIfAdminFilterIsPassedByRegularUser(string $type)
+    #[DataProvider('filterTypeDataProvider')]
+    public function test_no_servers_are_returned_if_admin_filter_is_passed_by_regular_user(string $type): void
     {
-        /** @var \Pterodactyl\Models\User[] $users */
+        /** @var \App\Models\User[] $users */
         $users = User::factory()->times(3)->create();
 
         $this->createServerModel(['user_id' => $users[0]->id]);
@@ -306,10 +308,10 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * Test that a subuser without the allocation.read permission is only able to see the primary
      * allocation for the server.
      */
-    public function testOnlyPrimaryAllocationIsReturnedToSubuser()
+    public function test_only_primary_allocation_is_returned_to_subuser(): void
     {
-        /** @var Server $server */
-        [$user, $server] = $this->generateTestAccount([Permission::ACTION_WEBSOCKET_CONNECT]);
+        /** @var \App\Models\Server $server */
+        [$user, $server] = $this->generateTestAccount([SubuserPermission::WebsocketConnect]);
         $server->allocation->notes = 'Test notes';
         $server->allocation->save();
 

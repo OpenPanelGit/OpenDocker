@@ -1,77 +1,47 @@
-# 🐳 OpenDocker
+<img width="20%" src="https://raw.githubusercontent.com/pelican-dev/panel/main/public/pelican.svg" alt="logo">
 
-**OpenDocker** est un fork moderne de **Pyrodactyl** (pyrodactyl.dev), pensé pour offrir une expérience plus complète, plus stylée et plus évolutive 🚀  
-L’objectif : un panel simple, puissant et prêt pour le futur.
+# Pelican Panel
 
----
+![Total Downloads](https://img.shields.io/github/downloads/pelican-dev/panel/total?style=flat&label=Total%20Downloads&labelColor=rgba(0%2C%2070%2C%20114%2C%201)&color=rgba(255%2C%20255%2C%20255%2C%201)) 
+![Latest Release](https://img.shields.io/github/v/release/pelican-dev/panel?style=flat&label=Latest%20Release&labelColor=rgba(0%2C%2070%2C%20114%2C%201)&color=rgba(255%2C%20255%2C%20255%2C%201))  
 
-## ✨ À propos
+Pelican Panel is an open-source, web-based application designed for easy management of game servers.
+It offers a user-friendly interface for deploying, configuring, and managing servers, with features like real-time resource monitoring, Docker container isolation, and extensive customization options.
+Ideal for both individual gamers and hosting companies, it simplifies server administration without requiring deep technical knowledge.
 
-OpenDocker reprend les bases solides de Pyrodactyl tout en ajoutant (et en prévoyant) des **fonctionnalités inédites** pour aller plus loin qu’un simple panel de gestion. Développé par l'organisation **OpenPanel**.
+Fly High, Game On: Pelican's pledge for unrivaled game servers.
 
-👉 Idéal pour les hébergeurs, développeurs et projets qui veulent quelque chose de clean, moderne et scalable.
+## Links
 
----
+* [Website](https://pelican.dev)
+* [Docs](https://pelican.dev/docs)
+* [Discord](https://discord.gg/pelican-panel)
+* [Wings](https://github.com/pelican-dev/wings)
 
-## 🔥 Fonctionnalités
+## Supported Games and Servers
 
-### ✅ Déjà disponible
-- 🧩 Basé sur **Pyrodactyl**
-- 🎨 Interface moderne et agréable
-- 🐳 Gestion des conteneurs Docker
-- 🔐 Authentification sécurisée
-- ⚡ Performances optimisées
-- 🛒 **Boutique de ressources** (CPU, RAM, Disque, Slots)
-- 🪙 **Système de Coins AFK** (gagnez des coins en restant sur le panel)
+Pelican supports a wide variety of games by utilizing Docker containers to isolate each instance.
+This gives you the power to run game servers without bloating machines with a host of additional dependencies.
 
-### � Prochainement
-- 🔌 Système de plugins / extensions
-- 📊 Statistiques avancées
-- 🌐 API améliorée
+Some of our popular eggs include:
 
----
+| Category                                                             | Eggs            |               |                    |                |
+|----------------------------------------------------------------------|-----------------|---------------|--------------------|----------------|
+| [Minecraft](https://github.com/pelican-eggs/minecraft)               | Paper           | Sponge        | Bungeecord         | Waterfall      |
+| [SteamCMD](https://github.com/pelican-eggs/steamcmd)                 | 7 Days to Die   | ARK: Survival | Arma 3             | Counter Strike |
+|                                                                      | DayZ            | Enshrouded    | Left 4 Dead        | Palworld       |
+|                                                                      | Project Zomboid | Satisfactory  | Sons of the Forest | Starbound      |
+| [Standalone Games](https://github.com/pelican-eggs/games-standalone) | Among Us        | Factorio      | FTL                | GTA            |
+|                                                                      | Kerbal Space    | Mindustry     | Rimworld           | Terraria       |
+| [Discord Bots](https://github.com/pelican-eggs/chatbots)             | Redbot          | JMusicBot     | Dynamica           |                |
+| [Voice Servers](https://github.com/pelican-eggs/voice)               | Mumble          | Teamspeak     | Lavalink           |                |
+| [Software](https://github.com/pelican-eggs/software)                 | Elasticsearch   | Gitea         | Grafana            | RabbitMQ       |
+| [Programming](https://github.com/pelican-eggs/generic)               | Node.js         | Python        | Java               | C#             |
+| [Databases](https://github.com/pelican-eggs/database)                | Redis           | MariaDB       | PostgreSQL         | MongoDB        |
+| [Storage](https://github.com/pelican-eggs/storage)                   | S3              | SFTP Share    |                    |                |
+| [Monitoring](https://github.com/pelican-eggs/monitoring)             | Prometheus      | Loki          |                    |                |
 
-## 🛠️ Installation
+## Repository Activity
+![Stats](https://repobeats.axiom.co/api/embed/4d8cc7012b325141e6fae9c34a22b3669ad5753b.svg "Repobeats analytics image")
 
-> ⚠️ En cours de rédaction  
-Un guide d’installation détaillé sera bientôt disponible.
-
----
-
-## 🧠 Philosophie
-
-OpenDocker, c’est :
-- 💡 **Simple** à utiliser
-- 🧼 **Propre** dans le code
-- 🔮 **Orienté futur**
-- 🧑‍💻 Pensé par et pour les devs
-
----
-
-## 🤝 Contribuer
-
-Les contributions sont **les bienvenues** 💙  
-Que ce soit pour :
-- Corriger des bugs 🐛  
-- Proposer des features ✨  
-- Améliorer la doc 📚  
-
-👉 Fork le repo, fais ta magie, et envoie une PR.
-
----
-
-## 📜 Licence
-
-Ce projet est sous licence **Apache-2.0** (comme Pyrodactyl).
-
----
-
-## ⭐ Crédit
-
-- Projet original : **Pyrodactyl** ([pyrodactyl.dev](https://pyrodactyl.dev))
-- Organisation : **OpenPanel**
-- Evolution : **OpenDocker**
-
----
-
-> 💬 OpenDocker est en développement actif. Reste connecté, le meilleur arrive.
+*Copyright Pelican® 2024-2026*

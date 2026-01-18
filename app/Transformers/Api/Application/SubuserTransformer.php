@@ -1,11 +1,12 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Application;
+namespace App\Transformers\Api\Application;
 
-use Pterodactyl\Models\Subuser;
+use App\Models\Server;
+use App\Models\Subuser;
+use App\Models\User;
 use League\Fractal\Resource\Item;
 use League\Fractal\Resource\NullResource;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
 
 class SubuserTransformer extends BaseTransformer
 {
@@ -23,9 +24,9 @@ class SubuserTransformer extends BaseTransformer
     }
 
     /**
-     * Return a transformed Subuser model that can be consumed by external services.
+     * @param  Subuser  $subuser
      */
-    public function transform(Subuser $subuser): array
+    public function transform($subuser): array
     {
         return [
             'id' => $subuser->id,
@@ -39,12 +40,10 @@ class SubuserTransformer extends BaseTransformer
 
     /**
      * Return a generic item of user for this subuser.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeUser(Subuser $subuser): Item|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_USERS)) {
+        if (!$this->authorize(User::RESOURCE_NAME)) {
             return $this->null();
         }
 
@@ -55,12 +54,10 @@ class SubuserTransformer extends BaseTransformer
 
     /**
      * Return a generic item of server for this subuser.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeServer(Subuser $subuser): Item|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_SERVERS)) {
+        if (!$this->authorize(Server::RESOURCE_NAME)) {
             return $this->null();
         }
 

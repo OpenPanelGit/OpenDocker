@@ -1,18 +1,21 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Files;
+namespace App\Http\Requests\Api\Client\Servers\Files;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Contracts\Http\ClientPermissionsRequest;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use App\Contracts\Http\ClientPermissionsRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
 
 class DeleteFileRequest extends ClientApiRequest implements ClientPermissionsRequest
 {
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_FILE_DELETE;
+        return SubuserPermission::FileDelete;
     }
 
+    /**
+     * @return string[]
+     */
     public function rules(): array
     {
         return [

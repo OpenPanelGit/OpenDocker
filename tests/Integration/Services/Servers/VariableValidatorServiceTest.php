@@ -1,25 +1,25 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Services\Servers;
+namespace App\Tests\Integration\Services\Servers;
 
-use Pterodactyl\Models\Egg;
-use Pterodactyl\Models\User;
+use App\Models\Egg;
+use App\Models\User;
+use App\Services\Servers\VariableValidatorService;
+use App\Tests\Integration\IntegrationTestCase;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
-use Pterodactyl\Services\Servers\VariableValidatorService;
 
 class VariableValidatorServiceTest extends IntegrationTestCase
 {
     protected Egg $egg;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
         /* @noinspection PhpFieldAssignmentTypeMismatchInspection */
         $this->egg = Egg::query()
-            ->where('author', 'support@pterodactyl.io')
+            ->where('author', 'panel@example.com')
             ->where('name', 'Bungeecord')
             ->firstOrFail();
     }
@@ -27,13 +27,14 @@ class VariableValidatorServiceTest extends IntegrationTestCase
     /**
      * Test that environment variables for a server are validated as expected.
      */
-    public function testEnvironmentVariablesCanBeValidated()
+    public function test_environment_variables_can_be_validated(): void
     {
         $egg = $this->cloneEggAndVariables($this->egg);
 
         try {
             $this->getService()->handle($egg->id, [
                 'BUNGEE_VERSION' => '1.2.3',
+                'SERVER_JARFILE' => '',
             ]);
 
             $this->fail('This statement should not be reached.');
@@ -52,22 +53,25 @@ class VariableValidatorServiceTest extends IntegrationTestCase
             'SERVER_JARFILE' => 'server.jar',
         ]);
 
+        $bungeeVersion = $response->firstWhere('key', 'BUNGEE_VERSION');
+        $serverJarfile = $response->firstWhere('key', 'SERVER_JARFILE');
+
         $this->assertInstanceOf(Collection::class, $response);
         $this->assertCount(2, $response);
-        $this->assertSame('BUNGEE_VERSION', $response->get(0)->key);
-        $this->assertSame('1234', $response->get(0)->value);
-        $this->assertSame('SERVER_JARFILE', $response->get(1)->key);
-        $this->assertSame('server.jar', $response->get(1)->value);
+        $this->assertSame('BUNGEE_VERSION', $bungeeVersion->key);
+        $this->assertSame('1234', $bungeeVersion->value);
+        $this->assertSame('SERVER_JARFILE', $serverJarfile->key);
+        $this->assertSame('server.jar', $serverJarfile->value);
     }
 
     /**
      * Test that variables that are user_editable=false do not get validated (or returned) by
      * the handler.
      */
-    public function testNormalUserCannotValidateNonUserEditableVariables()
+    public function test_normal_user_cannot_validate_non_user_editable_variables(): void
     {
         $egg = $this->cloneEggAndVariables($this->egg);
-        $egg->variables()->first()->update([
+        $egg->variables()->firstWhere('env_variable', 'BUNGEE_VERSION')->update([
             'user_editable' => false,
         ]);
 
@@ -79,11 +83,11 @@ class VariableValidatorServiceTest extends IntegrationTestCase
 
         $this->assertInstanceOf(Collection::class, $response);
         $this->assertCount(1, $response);
-        $this->assertSame('SERVER_JARFILE', $response->get(0)->key);
-        $this->assertSame('server.jar', $response->get(0)->value);
+        $this->assertSame('SERVER_JARFILE', $response->firstWhere('key', 'SERVER_JARFILE')->key);
+        $this->assertSame('server.jar', $response->firstWhere('key', 'SERVER_JARFILE')->value);
     }
 
-    public function testEnvironmentVariablesCanBeUpdatedAsAdmin()
+    public function test_environment_variables_can_be_updated_as_admin(): void
     {
         $egg = $this->cloneEggAndVariables($this->egg);
         $egg->variables()->first()->update([
@@ -107,20 +111,23 @@ class VariableValidatorServiceTest extends IntegrationTestCase
             'SERVER_JARFILE' => 'server.jar',
         ]);
 
+        $bungeeVersion = $response->firstWhere('key', 'BUNGEE_VERSION');
+        $serverJarfile = $response->firstWhere('key', 'SERVER_JARFILE');
+
         $this->assertInstanceOf(Collection::class, $response);
         $this->assertCount(2, $response);
-        $this->assertSame('BUNGEE_VERSION', $response->get(0)->key);
-        $this->assertSame('123', $response->get(0)->value);
-        $this->assertSame('SERVER_JARFILE', $response->get(1)->key);
-        $this->assertSame('server.jar', $response->get(1)->value);
+        $this->assertSame('BUNGEE_VERSION', $bungeeVersion->key);
+        $this->assertSame('123', $bungeeVersion->value);
+        $this->assertSame('SERVER_JARFILE', $serverJarfile->key);
+        $this->assertSame('server.jar', $serverJarfile->value);
     }
 
-    public function testNullableEnvironmentVariablesCanBeUsedCorrectly()
+    public function test_nullable_environment_variables_can_be_used_correctly(): void
     {
         $egg = $this->cloneEggAndVariables($this->egg);
         $egg->variables()->where('env_variable', '!=', 'BUNGEE_VERSION')->delete();
 
-        $egg->variables()->update(['rules' => 'nullable|string']);
+        $egg->variables()->update(['rules' => ['nullable', 'string']]);
 
         $response = $this->getService()->handle($egg->id, []);
         $this->assertCount(1, $response);

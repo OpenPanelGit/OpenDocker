@@ -1,9 +1,7 @@
 <?php
 
-namespace Pterodactyl\Exceptions\Repository;
+namespace App\Exceptions\Repository;
 
-use Pterodactyl\Exceptions\DisplayException;
+use App\Exceptions\DisplayException;
 
-class DuplicateDatabaseNameException extends DisplayException
-{
-}
+class DuplicateDatabaseNameException extends DisplayException {}

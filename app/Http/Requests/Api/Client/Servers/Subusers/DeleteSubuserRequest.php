@@ -1,13 +1,13 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Subusers;
+namespace App\Http\Requests\Api\Client\Servers\Subusers;
 
-use Pterodactyl\Models\Permission;
+use App\Enums\SubuserPermission;
 
 class DeleteSubuserRequest extends SubuserRequest
 {
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_USER_DELETE;
+        return SubuserPermission::UserDelete;
     }
 }

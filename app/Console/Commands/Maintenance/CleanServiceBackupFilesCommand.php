@@ -1,11 +1,12 @@
 <?php
 
-namespace Pterodactyl\Console\Commands\Maintenance;
+namespace App\Console\Commands\Maintenance;
 
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
+use Illuminate\Contracts\Filesystem\Filesystem;
+use SplFileInfo;
 
 class CleanServiceBackupFilesCommand extends Command
 {
@@ -30,13 +31,14 @@ class CleanServiceBackupFilesCommand extends Command
     /**
      * Handle command execution.
      */
-    public function handle()
+    public function handle(): void
     {
+        /** @var SplFileInfo[] */
         $files = $this->disk->files('services/.bak');
 
-        collect($files)->each(function (\SplFileInfo $file) {
+        collect($files)->each(function ($file) {
             $lastModified = Carbon::createFromTimestamp($this->disk->lastModified($file->getPath()));
-            if ((int) $lastModified->diffInMinutes(Carbon::now()) > self::BACKUP_THRESHOLD_MINUTES) {
+            if ($lastModified->diffInMinutes(Carbon::now()) > self::BACKUP_THRESHOLD_MINUTES) {
                 $this->disk->delete($file->getPath());
                 $this->info(trans('command/messages.maintenance.deleting_service_backup', ['file' => $file->getFilename()]));
             }

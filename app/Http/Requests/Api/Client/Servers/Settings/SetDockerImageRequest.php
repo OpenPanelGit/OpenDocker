@@ -1,19 +1,19 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Settings;
+namespace App\Http\Requests\Api\Client\Servers\Settings;
 
-use Webmozart\Assert\Assert;
-use Pterodactyl\Models\Server;
+use App\Contracts\Http\ClientPermissionsRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
+use App\Models\Server;
 use Illuminate\Validation\Rule;
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Contracts\Http\ClientPermissionsRequest;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use Webmozart\Assert\Assert;
 
 class SetDockerImageRequest extends ClientApiRequest implements ClientPermissionsRequest
 {
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_STARTUP_DOCKER_IMAGE;
+        return SubuserPermission::StartupDockerImage;
     }
 
     public function rules(): array
@@ -24,7 +24,7 @@ class SetDockerImageRequest extends ClientApiRequest implements ClientPermission
         Assert::isInstanceOf($server, Server::class);
 
         return [
-            'docker_image' => ['required', 'string', 'max:191', 'regex:/^[\w#\.\/\- ]*\|?~?[\w\.\/\-:@ ]*$/', Rule::in(array_values($server->egg->docker_images))],
+            'docker_image' => ['required', 'string', Rule::in(array_values($server->egg->docker_images))],
         ];
     }
 }

@@ -1,24 +1,25 @@
 <?php
 
-namespace Pterodactyl\Tests\Integration\Services\Schedules;
+namespace App\Tests\Integration\Services\Schedules;
 
-use Exception;
+use App\Exceptions\DisplayException;
+use App\Jobs\Schedule\RunTaskJob;
+use App\Models\Schedule;
+use App\Models\Task;
+use App\Services\Schedules\ProcessScheduleService;
+use App\Tests\Integration\IntegrationTestCase;
 use Carbon\CarbonImmutable;
-use Pterodactyl\Models\Task;
-use Pterodactyl\Models\Schedule;
-use Illuminate\Support\Facades\Bus;
+use Exception;
 use Illuminate\Contracts\Bus\Dispatcher;
-use Pterodactyl\Jobs\Schedule\RunTaskJob;
-use Pterodactyl\Exceptions\DisplayException;
-use Pterodactyl\Tests\Integration\IntegrationTestCase;
-use Pterodactyl\Services\Schedules\ProcessScheduleService;
+use Illuminate\Support\Facades\Bus;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class ProcessScheduleServiceTest extends IntegrationTestCase
 {
     /**
      * Test that a schedule with no tasks registered returns an error.
      */
-    public function testScheduleWithNoTasksReturnsException()
+    public function test_schedule_with_no_tasks_returns_exception(): void
     {
         $server = $this->createServerModel();
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
@@ -32,17 +33,17 @@ class ProcessScheduleServiceTest extends IntegrationTestCase
     /**
      * Test that an error during the schedule update is not persisted to the database.
      */
-    public function testErrorDuringScheduleDataUpdateDoesNotPersistChanges()
+    public function test_error_during_schedule_data_update_does_not_persist_changes(): void
     {
         $server = $this->createServerModel();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create([
             'server_id' => $server->id,
             'cron_minute' => 'hodor', // this will break the getNextRunDate() function.
         ]);
 
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task = Task::factory()->create(['schedule_id' => $schedule->id, 'sequence_id' => 1]);
 
         $this->expectException(\InvalidArgumentException::class);
@@ -56,17 +57,17 @@ class ProcessScheduleServiceTest extends IntegrationTestCase
     /**
      * Test that a job is dispatched as expected using the initial delay.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('dispatchNowDataProvider')]
-    public function testJobCanBeDispatchedWithExpectedInitialDelay(bool $now)
+    #[DataProvider('dispatchNowDataProvider')]
+    public function test_job_can_be_dispatched_with_expected_initial_delay(bool $now): void
     {
         Bus::fake();
 
         $server = $this->createServerModel();
 
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
 
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task = Task::factory()->create(['schedule_id' => $schedule->id, 'time_offset' => 10, 'sequence_id' => 1]);
 
         $this->getService()->handle($schedule, $now);
@@ -87,18 +88,16 @@ class ProcessScheduleServiceTest extends IntegrationTestCase
     /**
      * Test that even if a schedule's task sequence gets messed up the first task based on
      * the ascending order of tasks is used.
-     *
-     * @see https://github.com/pterodactyl/panel/issues/2534
      */
-    public function testFirstSequenceTaskIsFound()
+    public function test_first_sequence_task_is_found(): void
     {
         Bus::fake();
 
         $server = $this->createServerModel();
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id]);
 
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task2 = Task::factory()->create(['schedule_id' => $schedule->id, 'sequence_id' => 4]);
         $task = Task::factory()->create(['schedule_id' => $schedule->id, 'sequence_id' => 2]);
         $task3 = Task::factory()->create(['schedule_id' => $schedule->id, 'sequence_id' => 3]);
@@ -118,17 +117,15 @@ class ProcessScheduleServiceTest extends IntegrationTestCase
     /**
      * Tests that a task's processing state is reset correctly if using "dispatchNow" and there is
      * an exception encountered while running it.
-     *
-     * @see https://github.com/pterodactyl/panel/issues/2550
      */
-    public function testTaskDispatchedNowIsResetProperlyIfErrorIsEncountered()
+    public function test_task_dispatched_now_is_reset_properly_if_error_is_encountered(): void
     {
         $this->swap(Dispatcher::class, $dispatcher = \Mockery::mock(Dispatcher::class));
 
         $server = $this->createServerModel();
-        /** @var Schedule $schedule */
+        /** @var \App\Models\Schedule $schedule */
         $schedule = Schedule::factory()->create(['server_id' => $server->id, 'last_run_at' => null]);
-        /** @var Task $task */
+        /** @var \App\Models\Task $task */
         $task = Task::factory()->create(['schedule_id' => $schedule->id, 'sequence_id' => 1]);
 
         $dispatcher->expects('dispatchNow')->andThrows(new \Exception('Test thrown exception'));

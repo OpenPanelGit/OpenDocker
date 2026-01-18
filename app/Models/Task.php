@@ -1,12 +1,16 @@
 <?php
 
-namespace Pterodactyl\Models;
+namespace App\Models;
 
-use Illuminate\Container\Container;
-use Znck\Eloquent\Traits\BelongsToThrough;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Contracts\Validatable;
+use App\Extensions\Tasks\TaskSchemaInterface;
+use App\Extensions\Tasks\TaskService;
+use App\Traits\HasValidation;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Pterodactyl\Contracts\Extensions\HashidsInterface;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 /**
  * @property int $id
@@ -16,19 +20,16 @@ use Pterodactyl\Contracts\Extensions\HashidsInterface;
  * @property string $payload
  * @property int $time_offset
  * @property bool $is_queued
- * @property bool $is_processing
  * @property bool $continue_on_failure
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
- * @property string $hashid
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  * @property Schedule $schedule
  * @property Server $server
  */
-class Task extends Model
+class Task extends Model implements Validatable
 {
-    /** @use HasFactory<\Database\Factories\TaskFactory> */
     use HasFactory;
-    use BelongsToThrough;
+    use HasValidation;
 
     /**
      * The resource name for this model when it is transformed into an
@@ -37,19 +38,9 @@ class Task extends Model
     public const RESOURCE_NAME = 'schedule_task';
 
     /**
-     * The default actions that can exist for a task in Pterodactyl.
-     */
-    public const ACTION_POWER = 'power';
-    public const ACTION_COMMAND = 'command';
-    public const ACTION_BACKUP = 'backup';
-
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'tasks';
-
-    /**
      * Relationships to be updated when this model is updated.
+     *
+     * @var string[]
      */
     protected $touches = ['schedule'];
 
@@ -63,21 +54,7 @@ class Task extends Model
         'payload',
         'time_offset',
         'is_queued',
-        'is_processing',
         'continue_on_failure',
-    ];
-
-    /**
-     * Cast values to correct type.
-     */
-    protected $casts = [
-        'id' => 'integer',
-        'schedule_id' => 'integer',
-        'sequence_id' => 'integer',
-        'time_offset' => 'integer',
-        'is_queued' => 'boolean',
-        'is_processing' => 'boolean',
-        'continue_on_failure' => 'boolean',
     ];
 
     /**
@@ -86,32 +63,30 @@ class Task extends Model
     protected $attributes = [
         'time_offset' => 0,
         'is_queued' => false,
-        'is_processing' => false,
         'continue_on_failure' => false,
     ];
 
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'schedule_id' => 'required|numeric|exists:schedules,id',
-        'sequence_id' => 'required|numeric|min:1',
-        'action' => 'required|string',
-        'payload' => 'required_unless:action,backup|string',
-        'time_offset' => 'required|numeric|between:0,900',
-        'is_queued' => 'boolean',
-        'is_processing' => 'boolean',
-        'continue_on_failure' => 'boolean',
+        'schedule_id' => ['required', 'numeric', 'exists:schedules,id'],
+        'sequence_id' => ['required', 'numeric', 'min:1'],
+        'action' => ['required', 'string'],
+        'payload' => ['required_unless:action,backup', 'string'],
+        'time_offset' => ['required', 'numeric', 'between:0,900'],
+        'is_queued' => ['boolean'],
+        'continue_on_failure' => ['boolean'],
     ];
 
-    public function getRouteKeyName(): string
+    protected function casts(): array
     {
-        return $this->getKeyName();
-    }
-
-    /**
-     * Return a hashid encoded string to represent the ID of the task.
-     */
-    public function getHashidAttribute(): string
-    {
-        return Container::getInstance()->make(HashidsInterface::class)->encode($this->id);
+        return [
+            'id' => 'integer',
+            'schedule_id' => 'integer',
+            'sequence_id' => 'integer',
+            'time_offset' => 'integer',
+            'is_queued' => 'boolean',
+            'continue_on_failure' => 'boolean',
+        ];
     }
 
     /**
@@ -125,8 +100,28 @@ class Task extends Model
     /**
      * Return the server a task is assigned to, acts as a belongsToThrough.
      */
-    public function server(): \Znck\Eloquent\Relations\BelongsToThrough
+    public function server(): HasOneThrough
     {
-        return $this->belongsToThrough(Server::class, Schedule::class);
+        return $this->hasOneThrough(
+            Server::class,
+            Schedule::class,
+            'id', // schedules.id
+            'id', // servers.id
+            'schedule_id', // tasks.schedule_id
+            'server_id' // schedules.server_id
+        );
+    }
+
+    public function isFirst(): bool
+    {
+        return $this->schedule->firstTask()?->id === $this->id;
+    }
+
+    public function getSchema(): ?TaskSchemaInterface
+    {
+        /** @var TaskService $taskService */
+        $taskService = app(TaskService::class); // @phpstan-ignore myCustomRules.forbiddenGlobalFunctions
+
+        return $taskService->get($this->action);
     }
 }

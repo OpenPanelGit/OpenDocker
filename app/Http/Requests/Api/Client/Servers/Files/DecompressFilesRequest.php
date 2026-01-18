@@ -1,9 +1,9 @@
 <?php
 
-namespace Pterodactyl\Http\Requests\Api\Client\Servers\Files;
+namespace App\Http\Requests\Api\Client\Servers\Files;
 
-use Pterodactyl\Models\Permission;
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use App\Enums\SubuserPermission;
+use App\Http\Requests\Api\Client\ClientApiRequest;
 
 class DecompressFilesRequest extends ClientApiRequest
 {
@@ -12,9 +12,9 @@ class DecompressFilesRequest extends ClientApiRequest
      * rely on the archive permission here as it makes more sense to make sure the user can create
      * additional files rather than make an archive.
      */
-    public function permission(): string
+    public function permission(): SubuserPermission
     {
-        return Permission::ACTION_FILE_CREATE;
+        return SubuserPermission::FileCreate;
     }
 
     public function rules(): array

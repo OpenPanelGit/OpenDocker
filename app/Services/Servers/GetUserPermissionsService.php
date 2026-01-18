@@ -1,34 +1,43 @@
 <?php
 
-namespace Pterodactyl\Services\Servers;
+namespace App\Services\Servers;
 
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\Server;
+use App\Enums\SubuserPermission;
+use App\Models\Server;
+use App\Models\Subuser;
+use App\Models\User;
 
 class GetUserPermissionsService
 {
     /**
      * Returns the server specific permissions that a user has. This checks
-     * if they are an admin or a subuser for the server. If no permissions are
-     * found, an empty array is returned.
+     * if they are an admin, the owner or a subuser for the server. If no
+     * permissions are found, an empty array is returned.
+     *
+     * @return string[]
      */
     public function handle(Server $server, User $user): array
     {
-        if ($user->root_admin || $user->id === $server->owner_id) {
-            $permissions = ['*'];
+        $isOwner = $user->id === $server->owner_id;
+        $isAdmin = $user->isAdmin() && ($user->can('view', $server) || $user->can('update', $server));
 
-            if ($user->root_admin) {
-                $permissions[] = 'admin.websocket.errors';
-                $permissions[] = 'admin.websocket.install';
-                $permissions[] = 'admin.websocket.transfer';
-            }
-
-            return $permissions;
+        if ($isOwner && !$isAdmin) {
+            return ['*'];
         }
 
-        /** @var \Pterodactyl\Models\Subuser|null $subuserPermissions */
-        $subuserPermissions = $server->subusers()->where('user_id', $user->id)->first();
+        $adminPermissions = [
+            'admin.websocket.errors',
+            'admin.websocket.install',
+            'admin.websocket.transfer',
+        ];
 
-        return $subuserPermissions ? $subuserPermissions->permissions : [];
+        if ($isAdmin) {
+            return $isOwner || $user->can('update', $server) ? array_merge(['*'], $adminPermissions) : array_merge([SubuserPermission::WebsocketConnect->value], $adminPermissions);
+        }
+
+        /** @var Subuser|null $subuser */
+        $subuser = $server->subusers()->where('user_id', $user->id)->first();
+
+        return $subuser->permissions ?? [];
     }
 }

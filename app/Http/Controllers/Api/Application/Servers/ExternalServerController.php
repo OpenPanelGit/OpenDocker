@@ -1,16 +1,22 @@
 <?php
 
-namespace Pterodactyl\Http\Controllers\Api\Application\Servers;
+namespace App\Http\Controllers\Api\Application\Servers;
 
-use Pterodactyl\Models\Server;
-use Pterodactyl\Transformers\Api\Application\ServerTransformer;
-use Pterodactyl\Http\Controllers\Api\Application\ApplicationApiController;
-use Pterodactyl\Http\Requests\Api\Application\Servers\GetExternalServerRequest;
+use App\Http\Controllers\Api\Application\ApplicationApiController;
+use App\Http\Requests\Api\Application\Servers\GetExternalServerRequest;
+use App\Models\Server;
+use App\Transformers\Api\Application\ServerTransformer;
+use Dedoc\Scramble\Attributes\Group;
 
+#[Group('Server', weight: 1)]
 class ExternalServerController extends ApplicationApiController
 {
     /**
+     * View server (external id)
+     *
      * Retrieve a specific server from the database using its external ID.
+     *
+     * @return array<array-key, mixed>
      */
     public function index(GetExternalServerRequest $request, string $external_id): array
     {

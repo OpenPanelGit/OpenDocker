@@ -1,17 +1,18 @@
 <?php
 
-namespace Pterodactyl\Transformers\Api\Application;
+namespace App\Transformers\Api\Application;
 
-use Pterodactyl\Models\Database;
-use Pterodactyl\Models\DatabaseHost;
+use App\Models\Database;
+use App\Models\DatabaseHost;
+use App\Models\Node;
 use League\Fractal\Resource\Collection;
 use League\Fractal\Resource\NullResource;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
 
 class DatabaseHostTransformer extends BaseTransformer
 {
     protected array $availableIncludes = [
         'databases',
+        'nodes',
     ];
 
     /**
@@ -23,9 +24,9 @@ class DatabaseHostTransformer extends BaseTransformer
     }
 
     /**
-     * Transform database host into a representation for the application API.
+     * @param  DatabaseHost  $model
      */
-    public function transform(DatabaseHost $model): array
+    public function transform($model): array
     {
         return [
             'id' => $model->id,
@@ -33,7 +34,6 @@ class DatabaseHostTransformer extends BaseTransformer
             'host' => $model->host,
             'port' => $model->port,
             'username' => $model->username,
-            'node' => $model->node_id,
             'created_at' => $model->created_at->toAtomString(),
             'updated_at' => $model->updated_at->toAtomString(),
         ];
@@ -41,17 +41,29 @@ class DatabaseHostTransformer extends BaseTransformer
 
     /**
      * Include the databases associated with this host.
-     *
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
     public function includeDatabases(DatabaseHost $model): Collection|NullResource
     {
-        if (!$this->authorize(AdminAcl::RESOURCE_SERVER_DATABASES)) {
+        if (!$this->authorize(Database::RESOURCE_NAME)) {
             return $this->null();
         }
 
         $model->loadMissing('databases');
 
         return $this->collection($model->getRelation('databases'), $this->makeTransformer(ServerDatabaseTransformer::class), Database::RESOURCE_NAME);
+    }
+
+    /**
+     * Include the nodes associated with this host.
+     */
+    public function includeNodes(DatabaseHost $model): Collection|NullResource
+    {
+        if (!$this->authorize(Node::RESOURCE_NAME)) {
+            return $this->null();
+        }
+
+        $model->loadMissing('nodes');
+
+        return $this->collection($model->getRelation('nodes'), $this->makeTransformer(NodeTransformer::class), Node::RESOURCE_NAME);
     }
 }
