@@ -60,14 +60,14 @@ const App = () => {
             useTotp: OpenPanelUser.use_totp,
             createdAt: new Date(OpenPanelUser.created_at),
             updatedAt: new Date(OpenPanelUser.updated_at),
-            coins: Number(OpenPanelUser.coins),
-            rate: Number(OpenPanelUser.rate),
-            boughtCpu: OpenPanelUser.bought_cpu,
-            boughtMemory: OpenPanelUser.bought_memory,
-            boughtDisk: OpenPanelUser.bought_disk,
-            boughtSlots: OpenPanelUser.bought_slots,
-            boughtDatabases: OpenPanelUser.bought_databases,
-            boughtBackups: OpenPanelUser.bought_backups,
+            coins: Number(OpenPanelUser.coins || 0),
+            rate: Number(OpenPanelUser.rate || 0),
+            boughtCpu: Number(OpenPanelUser.bought_cpu || 0),
+            boughtMemory: Number(OpenPanelUser.bought_memory || 0),
+            boughtDisk: Number(OpenPanelUser.bought_disk || 0),
+            boughtSlots: Number(OpenPanelUser.bought_slots || 0),
+            boughtDatabases: Number(OpenPanelUser.bought_databases || 0),
+            boughtBackups: Number(OpenPanelUser.bought_backups || 0),
         });
     }
 

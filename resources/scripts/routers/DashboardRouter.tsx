@@ -31,7 +31,10 @@ const ActivityLogContainer = lazy(() => import('@/components/dashboard/activity/
 
 const DashboardRouter = () => {
     const location = useLocation();
-    const rootAdmin = useStoreState((state) => state.user.data!.rootAdmin);
+    const user = useStoreState((state) => state.user.data);
+    const rootAdmin = user?.rootAdmin ?? false;
+
+    if (!user) return null;
 
     // Mobile menu state
     const [isMobileMenuVisible, setMobileMenuVisible] = useState(false);
