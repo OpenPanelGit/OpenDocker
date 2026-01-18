@@ -80,48 +80,26 @@ class StoreController extends ClientApiController
      */
     public function afk(ClientApiRequest $request): JsonResponse
     {
-        $user = $request->user()->fresh();
-        $now = now();
-        $settings = app(SettingsRepositoryInterface::class);
+        $user = $request->user();
+        $gain = (float) $request->input('gain', 0);
         
-        // Earning rate (coins per minute) - Default to 0.1 if not set
-        $earningRate = (float) ($settings->get('store:afk_rate') ?? 0.1);
-        
-        if (!$user->last_afk_gain) {
-            $user->update(['last_afk_gain' => $now]);
-            return new JsonResponse(['success' => true, 'balance' => (float) $user->coins, 'rate' => $earningRate]);
+        // Basic sanity check: reject if gain is 0 or suspiciously high (e.g. > 1 coin in 10s)
+        if ($gain <= 0 || $gain > 1) { 
+            return new JsonResponse(['success' => false, 'balance' => (float) $user->coins]);
         }
 
-        $diffInSeconds = $now->diffInSeconds($user->last_afk_gain);
-        
-        // Award coins for any amount of time passed (per second precision)
-        // Award coins for any amount of time passed (per second precision)
-        if ($diffInSeconds >= 1) {
-            $gain = ($diffInSeconds / 60) * $earningRate;
-            
-            $oldBalance = (float) $user->coins;
-            
-            // Atomic update to prevent any race conditions or model state issues
-            \Illuminate\Support\Facades\DB::table('users')
-                ->where('id', $user->id)
-                ->update([
-                    'coins' => \Illuminate\Support\Facades\DB::raw('COALESCE(coins, 0) + ' . (float) $gain),
-                    'last_afk_gain' => $now,
-                ]);
-            
-            $freshUser = $user->fresh();
-            $newBalance = (float) $freshUser->coins;
-
-            \Illuminate\Support\Facades\Log::info("AFK Sync: User {$user->id} | Gain: {$gain} | Before: {$oldBalance} | After: {$newBalance}");
-
-            return new JsonResponse([
-                'success' => true,
-                'gain' => (float) $gain,
-                'balance' => $newBalance,
-                'rate' => $earningRate,
+        // Atomic update: just add what the client says it earned
+        \Illuminate\Support\Facades\DB::table('users')
+            ->where('id', $user->id)
+            ->update([
+                'coins' => \Illuminate\Support\Facades\DB::raw('COALESCE(coins, 0) + ' . (float) $gain),
+                'last_afk_gain' => now(),
             ]);
-        }
-
-        return new JsonResponse(['success' => true, 'balance' => (float) $user->coins, 'rate' => $earningRate]);
+        
+        $freshUser = $user->fresh();
+        return new JsonResponse([
+            'success' => true,
+            'balance' => (float) $freshUser->coins,
+        ]);
     }
 }

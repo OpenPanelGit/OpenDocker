@@ -14,42 +14,39 @@ const StoreBackground = () => {
     }, [user]);
 
     useEffect(() => {
-        // Initial safety check
         if (!userRef.current) return;
 
-        console.log('[Store] Background worker started.');
+        let accumulatedGain = 0;
 
         const sync = () => {
-            http.post('/api/client/store/afk')
+            if (accumulatedGain <= 0) return;
+
+            const gainToSend = accumulatedGain;
+            accumulatedGain = 0;
+
+            http.post('/api/client/store/afk', { gain: gainToSend })
                 .then(({ data }) => {
                     if (data.success) {
-                        updateUserData({
-                            coins: Number(data.balance),
-                            rate: Number(data.rate)
-                        });
-                        if (data.gain) {
-                            console.log(`[Store] Sync complete. Gained: ${data.gain.toFixed(4)}. Total: ${data.balance}`);
-                        }
+                        updateUserData({ coins: Number(data.balance) });
+                    } else {
+                        accumulatedGain += gainToSend;
                     }
                 })
-                .catch((error) => console.error('[Store] Sync failed:', error));
+                .catch((error) => {
+                    console.error('[Store] Sync failed:', error);
+                    accumulatedGain += gainToSend;
+                });
         };
 
-        // 1. Initial sync on load to set start time and catch up
-        sync();
-
-        // 2. Per-second smooth visual increment
         const tickInterval = setInterval(() => {
             const u = userRef.current;
             if (u && u.rate > 0) {
-                // local visual bump - FORCE NUMBER CAST to prevent string concatenation
-                const currentCoins = Number(u.coins);
-                const increment = u.rate / 60;
-                updateUserData({ coins: currentCoins + increment });
+                const step = u.rate / 60;
+                accumulatedGain += step;
+                updateUserData({ coins: Number(u.coins) + step });
             }
         }, 1000);
 
-        // 3. Regular server synchronization (every 30s for better persistence)
         const syncInterval = setInterval(sync, 10000);
 
         return () => {
