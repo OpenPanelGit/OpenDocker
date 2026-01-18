@@ -299,15 +299,34 @@ class User extends Model implements
      */
     public function allocatedResources(): array
     {
-        $stats = $this->servers()->selectRaw('SUM(memory) as memory, SUM(cpu) as cpu, SUM(disk) as disk, SUM(database_limit) as databases, SUM(backup_limit) as backups')->first();
+        try {
+            $stats = $this->servers()
+                ->selectRaw('
+                    COALESCE(SUM(memory), 0) as memory, 
+                    COALESCE(SUM(cpu), 0) as cpu, 
+                    COALESCE(SUM(disk), 0) as disk, 
+                    COALESCE(SUM(CASE WHEN database_limit > 0 THEN database_limit ELSE 0 END), 0) as databases,
+                    COALESCE(SUM(CASE WHEN backup_limit > 0 THEN backup_limit ELSE 0 END), 0) as backups
+                ')
+                ->first();
 
-        return [
-            'memory' => (int) ($stats->memory ?? 0),
-            'cpu' => (int) ($stats->cpu ?? 0),
-            'disk' => (int) ($stats->disk ?? 0),
-            'databases' => (int) ($stats->databases ?? 0),
-            'backups' => (int) ($stats->backups ?? 0),
-        ];
+            return [
+                'memory' => (int) ($stats->memory ?? 0),
+                'cpu' => (int) ($stats->cpu ?? 0),
+                'disk' => (int) ($stats->disk ?? 0),
+                'databases' => (int) ($stats->databases ?? 0),
+                'backups' => (int) ($stats->backups ?? 0),
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Error calculating allocated resources: ' . $e->getMessage());
+            return [
+                'memory' => 0,
+                'cpu' => 0,
+                'disk' => 0,
+                'databases' => 0,
+                'backups' => 0,
+            ];
+        }
     }
 
     /**
