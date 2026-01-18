@@ -18,17 +18,44 @@ class StoreController extends ClientApiController
     public function index(ClientApiRequest $request): array
     {
         $settings = app(SettingsRepositoryInterface::class);
+        $user = $request->user();
+        
+        // Ensure user has default values
+        if (is_null($user->bought_cpu)) {
+            $user->bought_cpu = 0;
+            $user->bought_memory = 0;
+            $user->bought_disk = 0;
+            $user->bought_slots = 0;
+            $user->bought_databases = 0;
+            $user->bought_backups = 0;
+            $user->save();
+        }
+        
+        try {
+            $available = $user->availableResources();
+        } catch (\Exception $e) {
+            \Log::error('Error getting available resources: ' . $e->getMessage());
+            $available = [
+                'memory' => 0,
+                'cpu' => 0,
+                'disk' => 0,
+                'databases' => 0,
+                'backups' => 0,
+                'slots' => 0,
+            ];
+        }
+        
         return [
             'success' => true,
             'products' => StoreProduct::where('enabled', true)->get(),
-            'balance' => (float) $request->user()->coins,
+            'balance' => (float) ($user->coins ?? 0),
             'rate' => (float) ($settings->get('store:afk_rate') ?? 0.1),
             'limit_cpu' => (int) ($settings->get('store:limit_cpu') ?? 100),
             'limit_memory' => (int) ($settings->get('store:limit_memory') ?? 4096),
             'limit_disk' => (int) ($settings->get('store:limit_disk') ?? 10240),
             'limit_databases' => (int) ($settings->get('store:limit_databases') ?? 5),
             'limit_backups' => (int) ($settings->get('store:limit_backups') ?? 5),
-            'available' => $request->user()->availableResources(),
+            'available' => $available,
         ];
     }
 

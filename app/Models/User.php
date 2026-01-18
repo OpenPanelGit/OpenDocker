@@ -318,12 +318,12 @@ class User extends Model implements
         $allocated = $this->allocatedResources();
 
         return [
-            'memory' => max(0, $this->bought_memory - $allocated['memory']),
-            'cpu' => max(0, $this->bought_cpu - $allocated['cpu']),
-            'disk' => max(0, $this->bought_disk - $allocated['disk']),
-            'databases' => max(0, $this->bought_databases - $allocated['databases']),
-            'backups' => max(0, $this->bought_backups - $allocated['backups']),
-            'slots' => max(0, $this->bought_slots - $this->servers()->count()),
+            'memory' => max(0, ($this->bought_memory ?? 0) - $allocated['memory']),
+            'cpu' => max(0, ($this->bought_cpu ?? 0) - $allocated['cpu']),
+            'disk' => max(0, ($this->bought_disk ?? 0) - $allocated['disk']),
+            'databases' => max(0, ($this->bought_databases ?? 0) - $allocated['databases']),
+            'backups' => max(0, ($this->bought_backups ?? 0) - $allocated['backups']),
+            'slots' => max(0, ($this->bought_slots ?? 0) - $this->servers()->count()),
         ];
     }
 }
