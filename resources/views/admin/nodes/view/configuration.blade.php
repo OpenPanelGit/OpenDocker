@@ -73,10 +73,16 @@
 
             var commandTemplate = "{!! addslashes($node->getAutoDeploy("PLACEHOLDER_TOKEN")) !!}";
             var command = commandTemplate.replace('PLACEHOLDER_TOKEN', data.token);
+
+            var installUrl = "{{ config('app.url') }}/api/remote/install/{{ $node->uuid }}?token=" + data.token;
+            var installCommand = "curl -sSL " + installUrl + " | sudo bash";
+
             swal({
                 type: 'success',
-                title: 'Token created.',
-                text: "<p>To auto-configure your node run the following command:<br /><small><pre>" + command + "</pre></small></p>",
+                title: 'Token créé !',
+                text: "<p>Pour configurer <b>uniquement</b> le fichier config.yml :<br /><small><pre>" + command + "</pre></small></p>" +
+                      "<hr />" +
+                      "<p><b>OU</b> pour une installation <b>TOTALEMENT AUTOMATIQUE</b> (Docker + Wings + Config) :<br /><small><pre>" + installCommand + "</pre></small></p>",
                 html: true,
             })
         }).fail(function () {

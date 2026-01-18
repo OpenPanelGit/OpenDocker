@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Api\Remote\ActivityProcessingController;
+use Pterodactyl\Http\Controllers\Admin\Nodes\NodeInstallScriptController;
 use Pterodactyl\Http\Controllers\Api\Remote\RusticConfigController;
 use Pterodactyl\Http\Controllers\Api\Remote\SftpAuthenticationController;
 use Pterodactyl\Http\Controllers\Api\Remote\Backups\BackupDeleteController;
@@ -44,3 +45,5 @@ Route::group(['prefix' => '/backups'], function () {
 Route::group(['prefix' => '/elytra-jobs'], function () {
     Route::put('/{jobId}', [ElytraJobCompletionController::class, 'update']);
 });
+
+Route::get('/install/{node:uuid}', NodeInstallScriptController::class);
