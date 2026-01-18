@@ -4,7 +4,7 @@ import { useStoreState } from 'easy-peasy';
 import http from '@/api/http';
 import useFlash from '@/plugins/useFlash';
 import Spinner from '@/components/elements/Spinner';
-import { Form, Formik, Field } from 'formik';
+import { Form, Formik, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { Server, Folder, Plus } from '@gravity-ui/icons';
 import styled from 'styled-components';
@@ -224,7 +224,7 @@ const CreateServerContainer = () => {
                     })}
                     onSubmit={submit}
                 >
-                    {({ values, isSubmitting, setFieldValue }) => (
+                    {({ values, isSubmitting, setFieldValue, isValid, submitCount }) => (
                         <Form>
                             <Card>
                                 <div className='mb-10'>
@@ -236,6 +236,7 @@ const CreateServerContainer = () => {
                                         <div>
                                             <Label>Nom du Serveur</Label>
                                             <Input name='name' placeholder='Mon super serveur' />
+                                            <ErrorMessage name='name' component='div' className='text-red-500 text-xs mt-1' />
                                         </div>
                                         <div>
                                             <Label>Catégorie (Nest)</Label>
@@ -255,6 +256,7 @@ const CreateServerContainer = () => {
                                                     <option key={nest.id} value={nest.id}>{nest.name}</option>
                                                 ))}
                                             </Select>
+                                            <ErrorMessage name='nest_id' component='div' className='text-red-500 text-xs mt-1' />
                                         </div>
                                     </FormRow>
 
@@ -266,6 +268,7 @@ const CreateServerContainer = () => {
                                                     <option key={egg.id} value={egg.id}>{egg.name}</option>
                                                 )) || <option disabled>Aucun egg disponible</option>}
                                             </Select>
+                                            <ErrorMessage name='egg_id' component='div' className='text-red-500 text-xs mt-1' />
                                         </div>
                                     </FormRow>
                                 </div>
@@ -292,6 +295,7 @@ const CreateServerContainer = () => {
                                                 value={values.cpu}
                                                 onChange={e => setFieldValue('cpu', parseInt(e.target.value))}
                                             />
+                                            <ErrorMessage name='cpu' component='div' className='text-red-500 text-xs mt-1' />
                                         </div>
 
                                         <div className='bg-[#111] p-4 rounded-lg border border-white/5'>
@@ -309,6 +313,7 @@ const CreateServerContainer = () => {
                                                 value={values.memory}
                                                 onChange={e => setFieldValue('memory', parseInt(e.target.value))}
                                             />
+                                            <ErrorMessage name='memory' component='div' className='text-red-500 text-xs mt-1' />
                                         </div>
 
                                         <div className='bg-[#111] p-4 rounded-lg border border-white/5'>
@@ -326,6 +331,7 @@ const CreateServerContainer = () => {
                                                 value={values.disk}
                                                 onChange={e => setFieldValue('disk', parseInt(e.target.value))}
                                             />
+                                            <ErrorMessage name='disk' component='div' className='text-red-500 text-xs mt-1' />
                                         </div>
 
                                         <div className='bg-[#111] p-4 rounded-lg border border-white/5'>
@@ -371,6 +377,11 @@ const CreateServerContainer = () => {
                                         >
                                             {isSubmitting ? 'Création en cours...' : 'Déployer maintenant'}
                                         </button>
+                                        {!isValid && submitCount > 0 && (
+                                            <p className='text-red-500 text-center text-sm mt-4 font-bold'>
+                                                Veuillez corriger les erreurs ci-dessus avant de continuer.
+                                            </p>
+                                        )}
                                         {(available.slots || 0) <= 0 && (
                                             <p className='text-red-500 text-center text-sm mt-4 font-bold'>
                                                 Vous n'avez plus de slots de serveur disponibles (Slots restants: {available.slots || 0}). Passez à la boutique !
