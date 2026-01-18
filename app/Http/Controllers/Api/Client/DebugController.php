@@ -14,6 +14,18 @@ class DebugController extends ClientApiController
     {
         $user = $request->user();
         
+        try {
+            $available = $user->availableResources();
+        } catch (\Exception $e) {
+            $available = ['error' => $e->getMessage()];
+        }
+        
+        try {
+            $allocated = $user->allocatedResources();
+        } catch (\Exception $e) {
+            $allocated = ['error' => $e->getMessage()];
+        }
+        
         return new JsonResponse([
             'user_id' => $user->id,
             'username' => $user->username,
@@ -24,8 +36,8 @@ class DebugController extends ClientApiController
             'bought_slots' => $user->bought_slots,
             'bought_databases' => $user->bought_databases,
             'bought_backups' => $user->bought_backups,
-            'available_resources' => $user->availableResources(),
-            'allocated_resources' => $user->allocatedResources(),
+            'available_resources' => $available,
+            'allocated_resources' => $allocated,
             'servers_count' => $user->servers()->count(),
         ]);
     }
