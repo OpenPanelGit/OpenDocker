@@ -323,7 +323,7 @@ class User extends Model implements
             'disk' => max(0, $this->bought_disk - $allocated['disk']),
             'databases' => max(0, $this->bought_databases - $allocated['databases']),
             'backups' => max(0, $this->bought_backups - $allocated['backups']),
-            'slots' => (int) $this->bought_slots,
+            'slots' => max(0, $this->bought_slots - $this->servers()->count()),
         ];
     }
 }
